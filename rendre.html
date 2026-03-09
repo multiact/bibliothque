@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rendre un livre</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='icone.png') }}">
+</head>
+
+<body>
+
+<header class="topbar">
+
+<div class="brand">
+<div class="logo">📚</div>
+
+<div>
+<div class="brand-title">Bibliothèque de Valence</div>
+<div class="brand-subtitle">Centre-ville</div>
+</div>
+</div>
+
+<nav class="nav">
+
+<a class="nav-link" href="{{ url_for('home') }}">Accueil</a>
+
+<a class="nav-link" href="{{ url_for('reserver') }}">Réserver un livre</a>
+
+<a class="nav-link" href="{{ url_for('rendre') }}">Rendre un livre</a>
+
+<a class="nav-link nav-cta" href="{{ url_for('connexion') }}">Connexion</a>
+
+</nav>
+
+</header>
+
+
+<main class="container">
+
+<section class="hero">
+
+<h1>Rendre un livre</h1>
+
+<p>Veuillez entrer les informations du livre que vous souhaitez rendre.</p>
+
+<div class="form-box">
+
+<form method="POST">
+
+<div class="form-group">
+<label>Numéro de carte bibliothèque</label>
+<input type="text" name="carte" required>
+</div>
+
+<div class="form-group">
+<label>Titre du livre</label>
+<input type="text" name="titre" required>
+</div>
+
+<div class="form-group">
+<label>Auteur</label>
+<input type="text" name="auteur">
+</div>
+
+<div class="form-group">
+<label>Date de retour</label>
+<input type="date" name="date_retour">
+</div>
+
+<button type="submit">Valider le retour</button>
+
+</form>
+
+</div>
+
+</section>
+
+</main>
+
+
+<footer class="footer">
+
+<p>2026 Bibliothèque de Valence</p>
+
+</footer>
+
+</body>
+
+</html>
