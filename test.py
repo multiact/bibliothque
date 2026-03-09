@@ -60,6 +60,10 @@ def creer_compte():
         return redirect(url_for("connexion"))
 
     return render_template("connexion.html")
+@app.route("/romans")
+def romans():
+    return render_template("romans.html")
 
 if __name__ == "__main__":
+
     app.run(debug=True)
