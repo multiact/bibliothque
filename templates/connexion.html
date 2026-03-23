@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
+</head>
+<body>
+
+<header class="entete">
+    <div class="bloc-logo">
+        <div class="logo">📚</div>
+        <div>
+            <div class="nom-biblio">Bibliothèque de Valence</div>
+            <div class="sous-titre">Centre-ville</div>
+        </div>
+    </div>
+
+    <nav class="menu">
+        <a class="lien-menu" href="{{ url_for('accueil') }}">Accueil</a>
+
+        <div class="menu-deroulant">
+            <button class="bouton-menu" type="button">Catalogue</button>
+
+            <div class="contenu-menu">
+                <div class="sous-menu">
+                    <button class="titre-sous-menu" type="button">Livres</button>
+
+                    <div class="contenu-sous-menu">
+                        <a href="{{ url_for('catalogue', categorie='romans') }}">Romans classiques</a>
+                        <a href="{{ url_for('catalogue', categorie='jeunesse') }}">Jeunesse</a>
+                        <a href="{{ url_for('catalogue', categorie='Horreur') }}">Horreur</a>
+                        <a href="{{ url_for('catalogue', categorie='scifiction') }}">Science-fiction</a>
+                        <a href="{{ url_for('catalogue', categorie='Trilleur') }}">Thriller</a>
+                        <a href="{{ url_for('catalogue', categorie='devperso') }}">Développement personnel</a>
+                        <a href="{{ url_for('catalogue', categorie='Biographie') }}">Biographie</a>
+                        <a href="{{ url_for('catalogue', categorie='bd') }}">BD / mangas</a>
+                        <a href="{{ url_for('catalogue', categorie='documentaires') }}">Documentaires</a>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('cddvd') }}">CD / DVD</a>
+            </div>
+        </div>
+
+        <a class="lien-menu" href="{{ url_for('reserver') }}">Réserver un livre</a>
+        <a class="lien-menu" href="{{ url_for('rendre') }}">Rendre un livre</a>
+
+        {% if utilisateur %}
+            <span class="lien-menu">Bonjour {{ utilisateur.prenom }}</span>
+            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
+        {% else %}
+            <a class="lien-menu bouton-connexion" href="{{ url_for('connexion') }}">Connexion</a>
+        {% endif %}
+    </nav>
+</header>
+
+<main class="conteneur">
+    <section class="bloc-principal">
+        <h1>Mon compte</h1>
+        <p>Connecte-toi ou crée un compte.</p>
+
+        {% if erreur %}
+            <div class="message-erreur">
+                {{ erreur }}
+            </div>
+        {% endif %}
+
+        <div class="bloc-connexion">
+
+            <div class="formulaire">
+                <h2>Créer un compte</h2>
+
+                <form method="POST" action="{{ url_for('creer_compte') }}">
+                    <div class="grille-formulaire">
+
+                        <div class="champ-formulaire">
+                            <label for="prenom">Prénom</label>
+                            <input type="text" id="prenom" name="prenom" required>
+                        </div>
+
+                        <div class="champ-formulaire">
+                            <label for="nom_utilisateur">Nom d'utilisateur</label>
+                            <input type="text" id="nom_utilisateur" name="nom_utilisateur" required>
+                        </div>
+
+                        <div class="champ-formulaire">
+                            <label for="date_naissance">Date de naissance</label>
+                            <input type="date" id="date_naissance" name="date_naissance" required>
+                        </div>
+
+                        <div class="champ-formulaire">
+                            <label for="code_postal">Code postal</label>
+                            <input type="text" id="code_postal" name="code_postal" required>
+                        </div>
+
+                        <div class="champ-formulaire grand">
+                            <label for="email_creation">Adresse mail</label>
+                            <input type="email" id="email_creation" name="email" required>
+                        </div>
+
+                        <div class="champ-formulaire grand">
+                            <label for="motdepasse_creation">Mot de passe</label>
+                            <input type="password" id="motdepasse_creation" name="password" required>
+                        </div>
+
+                        <div class="champ-formulaire grand">
+                            <button type="submit">Créer le compte</button>
+                        </div>
+
+                    </div>
+                </form>
+            </div>
+
+            <div class="separation">OU</div>
+
+            <div class="formulaire">
+                <h2>Connexion</h2>
+
+                <form method="POST" action="{{ url_for('connexion') }}" class="formulaire-simple">
+
+                    <div class="champ-formulaire">
+                        <label for="email_connexion">Adresse mail</label>
+                        <input type="email" id="email_connexion" name="email" required>
+                    </div>
+
+                    <div class="champ-formulaire">
+                        <label for="motdepasse_connexion">Mot de passe</label>
+                        <input type="password" id="motdepasse_connexion" name="password" required>
+                    </div>
+
+                    <div class="champ-formulaire">
+                        <button type="submit">Se connecter</button>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+    </section>
+</main>
+
+<footer class="pied-page">
+    <p>2026 Bibliothèque de Valence</p>
+</footer>
+
+</body>
+</html>

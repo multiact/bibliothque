@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Bibliothèque de Valence</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
+</head>
+<body>
+
+<header class="entete">
+    <div class="bloc-logo">
+        <div class="logo">📚</div>
+        <div>
+            <div class="nom-biblio">Bibliothèque de Valence</div>
+            <div class="sous-titre">Centre-ville</div>
+        </div>
+    </div>
+
+    <nav class="menu">
+        <a class="lien-menu" href="{{ url_for('accueil') }}">Accueil</a>
+
+        <div class="menu-deroulant">
+            <button class="bouton-menu" type="button">Catalogue</button>
+
+            <div class="contenu-menu">
+                <div class="sous-menu">
+                    <button class="titre-sous-menu" type="button">Livres</button>
+
+                    <div class="contenu-sous-menu">
+                        <a href="{{ url_for('catalogue', categorie='romans') }}">Romans classiques</a>
+                        <a href="{{ url_for('catalogue', categorie='jeunesse') }}">Jeunesse</a>
+                        <a href="{{ url_for('catalogue', categorie='Horreur') }}">Horreur</a>
+                        <a href="{{ url_for('catalogue', categorie='scifiction') }}">Science-fiction</a>
+                        <a href="{{ url_for('catalogue', categorie='Trilleur') }}">Thriller</a>
+                        <a href="{{ url_for('catalogue', categorie='devperso') }}">Développement personnel</a>
+                        <a href="{{ url_for('catalogue', categorie='Biographie') }}">Biographie</a>
+                        <a href="{{ url_for('catalogue', categorie='bd') }}">BD / mangas</a>
+                        <a href="{{ url_for('catalogue', categorie='documentaires') }}">Documentaires</a>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('cddvd') }}">CD / DVD</a>
+            </div>
+        </div>
+
+        <a class="lien-menu" href="{{ url_for('reserver') }}">Réserver un livre</a>
+        <a class="lien-menu" href="{{ url_for('rendre') }}">Rendre un livre</a>
+
+        {% if utilisateur %}
+            <span class="lien-menu">Bonjour {{ utilisateur.prenom }}</span>
+            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
+        {% else %}
+            <a class="lien-menu bouton-connexion" href="{{ url_for('connexion') }}">Connexion</a>
+        {% endif %}
+    </nav>
+</header>
+
+<main class="conteneur">
+    <section class="bloc-principal">
+        <h1>Bienvenue à la bibliothèque de Valence</h1>
+        <p>Bibliothèque du centre-ville</p>
+
+        <div class="liste-blocs">
+            <a class="bloc" href="{{ url_for('catalogue', categorie='romans') }}">
+                <h3>Romans</h3>
+                <p>Voir les romans disponibles.</p>
+            </a>
+
+            <a class="bloc" href="{{ url_for('reserver') }}">
+                <h3>Réserver un livre</h3>
+                <p>Faire une réservation en ligne.</p>
+            </a>
+
+            {% if utilisateur %}
+                <a class="bloc" href="{{ url_for('mes_reservations') }}">
+                    <h3>Mes réservations</h3>
+                    <p>Voir mes réservations en cours.</p>
+                </a>
+            {% else %}
+                <a class="bloc" href="{{ url_for('connexion') }}">
+                    <h3>Mon compte</h3>
+                    <p>Se connecter ou créer un compte.</p>
+                </a>
+            {% endif %}
+        </div>
+
+        <h2>Horaires de la bibliothèque</h2>
+
+        <table class="tableau-horaires">
+            <thead>
+                <tr>
+                    <th>Jour</th>
+                    <th>Matin</th>
+                    <th>Après-midi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Lundi</td>
+                    <td>Fermé</td>
+                    <td>Fermé</td>
+                </tr>
+                <tr>
+                    <td>Mardi</td>
+                    <td>8h30 - 12h</td>
+                    <td>14h - 18h</td>
+                </tr>
+                <tr>
+                    <td>Mercredi</td>
+                    <td>8h30 - 12h</td>
+                    <td>14h - 18h</td>
+                </tr>
+                <tr>
+                    <td>Jeudi</td>
+                    <td>8h30 - 12h</td>
+                    <td>14h - 18h</td>
+                </tr>
+                <tr>
+                    <td>Vendredi</td>
+                    <td>8h30 - 12h</td>
+                    <td>14h - 20h</td>
+                </tr>
+                <tr>
+                    <td>Samedi</td>
+                    <td>10h - 13h</td>
+                    <td>14h - 17h</td>
+                </tr>
+                <tr>
+                    <td>Dimanche</td>
+                    <td>10h - 12h</td>
+                    <td>Fermé</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+
+<footer class="pied-page">
+    <p>2026 Bibliothèque de Valence</p>
+</footer>
+
+</body>
+</html>
