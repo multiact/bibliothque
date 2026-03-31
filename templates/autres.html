@@ -52,6 +52,7 @@
 <div class="zone-graphe">
     <img src="data:image/png;base64,[[ graph_image ]]" alt="Graphique connexions par heure" class="image-graphe">
 </div>
+<p><strong>Total des connexions :</strong> [[ total_connexions ]]</p>
 [% else %]
 <div class="message-erreur">[[ graph_info ]]</div>
 [% endif %]
@@ -80,6 +81,62 @@
             [% else %]
             <tr>
                 <td colspan="4">Aucune demande pour le moment.</td>
+            </tr>
+            [% endfor %]
+        </tbody>
+    </table>
+</div>
+
+<h2>Top 5 CD les plus demandés</h2>
+<div class="table-conteneur">
+    <table class="tableau-horaires">
+        <thead>
+            <tr>
+                <th>Rang</th>
+                <th>CD</th>
+                <th>Demandes</th>
+                <th>Voir</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% for item in top_cds_demandes %]
+            <tr>
+                <td>[[ loop.index ]]</td>
+                <td>[[ item["nom_cd_dvd"] ]]</td>
+                <td>[[ item["nb_demandes"] ]]</td>
+                <td><a href="/cddvd?q=[[ item['nom_cd_dvd']|urlencode ]]">Voir ce CD</a></td>
+            </tr>
+            [% else %]
+            <tr>
+                <td colspan="4">Aucune demande CD pour le moment.</td>
+            </tr>
+            [% endfor %]
+        </tbody>
+    </table>
+</div>
+
+<h2>Top 5 DVD les plus demandés</h2>
+<div class="table-conteneur">
+    <table class="tableau-horaires">
+        <thead>
+            <tr>
+                <th>Rang</th>
+                <th>DVD</th>
+                <th>Demandes</th>
+                <th>Voir</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% for item in top_dvds_demandes %]
+            <tr>
+                <td>[[ loop.index ]]</td>
+                <td>[[ item["nom_cd_dvd"] ]]</td>
+                <td>[[ item["nb_demandes"] ]]</td>
+                <td><a href="/cddvd?q=[[ item['nom_cd_dvd']|urlencode ]]">Voir ce DVD</a></td>
+            </tr>
+            [% else %]
+            <tr>
+                <td colspan="4">Aucune demande DVD pour le moment.</td>
             </tr>
             [% endfor %]
         </tbody>

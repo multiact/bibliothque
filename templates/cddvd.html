@@ -23,6 +23,12 @@
         <p><strong>Numéro :</strong> [[ item["id_cd_dvd"] ]]</p>
         <p><strong>Artiste :</strong> [[ item["artiste_cd_dvd"] or "Non renseigné" ]]</p>
         <p><strong>Année :</strong> [[ item["annee_cd_dvd"] or "Non renseignée" ]]</p>
+        <p><strong>Exemplaires restants :</strong> [[ item["exemplaires_restants"] ]] / [[ item["total_exemplaires"] ]]</p>
+        [% if item["exemplaires_restants"] > 0 %]
+            <p class="disponible">Disponible</p>
+        [% else %]
+            <p class="indisponible">Indisponible</p>
+        [% endif %]
     </div>
     [% else %]
     <p>Aucun CD/DVD trouvé.</p>

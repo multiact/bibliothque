@@ -111,22 +111,23 @@
     </div>
 
     <div class="formulaire">
-        <h2>Supprimer un livre / CD/DVD</h2>
+        <h2>Gérer un livre / CD/DVD existant</h2>
         <form method="POST" action="[[ url_for('admin') ]]">
-            <input type="hidden" name="action" value="supprimer">
+            <input type="hidden" name="action" value="gerer_existant">
             <div class="champ-formulaire">
                 <label>ISBN livre</label>
-                <input type="text" name="isbn_livre_suppression" placeholder="Ex: 9781234567890">
+                <input type="text" name="isbn_livre_existant" placeholder="Ex: 9781234567890">
             </div>
             <div class="champ-formulaire">
                 <label>Numéro CD/DVD</label>
-                <input type="number" name="numero_cd_dvd_suppression" placeholder="Ex: 15">
+                <input type="number" name="numero_cd_dvd_existant" placeholder="Ex: 15">
             </div>
             <div class="champ-formulaire">
-                <button type="submit">Supprimer</button>
+                <button type="submit" name="operation" value="+">+ Ajouter</button>
+                <button type="submit" name="operation" value="-">- Supprimer</button>
             </div>
         </form>
-        <p>Remplis un seul champ pour supprimer un élément.</p>
+        <p>Remplis un seul champ. + restaure un élément supprimé, - supprime l'élément existant.</p>
     </div>
 </div>
 
@@ -151,12 +152,19 @@
                 [% endif %]
                 <br>
                 Réf. : [[ item['reference_media'] ]] | Supprimé le [[ item['date_suppression'] ]]
+                [% if item['restaure'] == 1 %]
+                | Restauré le [[ item['date_restauration'] or '-' ]]
+                [% endif %]
             </div>
-            <form method="POST" action="[[ url_for('admin', q_supp=recherche_suppression, voir='1' if voir_plus else None) ]]">
-                <input type="hidden" name="action" value="restaurer">
-                <input type="hidden" name="id_suppression" value="[[ item['id_suppression'] ]]">
-                <button type="submit">Rajouter</button>
-            </form>
+            [% if item['restaure'] == 0 %]
+                <form method="POST" action="[[ url_for('admin', q_supp=recherche_suppression, voir='1' if voir_plus else None) ]]">
+                    <input type="hidden" name="action" value="restaurer">
+                    <input type="hidden" name="id_suppression" value="[[ item['id_suppression'] ]]">
+                    <button type="submit">Rajouter</button>
+                </form>
+            [% else %]
+                <span class="indisponible">Restauré</span>
+            [% endif %]
         </div>
         [% else %]
         <p>Aucun élément supprimé trouvé.</p>

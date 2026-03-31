@@ -54,6 +54,24 @@ def prochain_nom_image_livre(base, id_categorie):
 def prochain_nom_image_cddvd(base):
     total = base.execute('SELECT COUNT(*) AS total FROM "CD/DVD"').fetchone()["total"]
     return "cddvd_%02d.jpg" % (int(total) + 1)
+def stock_initial_cddvd(nom_cd_dvd):
+    nom_normalise = unicodedata.normalize("NFKD", str(nom_cd_dvd)).encode("ascii", "ignore").decode("ascii").lower().strip()
+    cddvd_tres_connus = {
+        "thriller",
+        "back in black",
+        "the dark side of the moon",
+        "the bodyguard",
+        "rumours",
+        "hotel california",
+        "nevermind",
+        "purple rain",
+        "the eminem show",
+        "dune",
+    }
+    base_score = sum(ord(c) for c in nom_normalise)
+    if nom_normalise in cddvd_tres_connus:
+        return 4 + (base_score % 2)
+    return 1 + (base_score % 5)
 def enregistrer_image_upload(fichier, nom_fichier):
     if not fichier or not fichier.filename:
         return None
@@ -79,10 +97,81 @@ def prochain_identifiant(base, table, colonne):
     )
 def ajouter_log_connexion(id_client):
     base = bdd()
+    assurer_tables_stats_connexion(base)
+    instant = datetime.now()
     base.execute(
         "INSERT INTO CONNEXION_LOG (id_client, date_connexion) VALUES (?, ?)",
-        (id_client, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        (id_client, instant.strftime("%Y-%m-%d %H:%M:%S")),
     )
+    incrementer_stats_connexion(base, instant)
+    base.commit()
+def incrementer_stats_connexion(base, instant=None):
+    moment = instant or datetime.now()
+    heure = int(moment.strftime("%H"))
+    base.execute(
+        """
+        INSERT INTO CONNEXION_STATS_HEURE (heure, nb_connexions)
+        VALUES (?, 1)
+        ON CONFLICT(heure) DO UPDATE SET nb_connexions = nb_connexions + 1
+        """,
+        (heure,),
+    )
+    base.execute(
+        """
+        UPDATE CONNEXION_STATS_GLOBALE
+        SET total_connexions = total_connexions + 1
+        WHERE id_unique = 1
+        """,
+    )
+def assurer_tables_stats_connexion(base):
+    base.execute(
+        """
+        CREATE TABLE IF NOT EXISTS CONNEXION_STATS_HEURE (
+            heure INTEGER PRIMARY KEY,
+            nb_connexions INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    base.execute(
+        """
+        CREATE TABLE IF NOT EXISTS CONNEXION_STATS_GLOBALE (
+            id_unique INTEGER PRIMARY KEY CHECK (id_unique = 1),
+            total_connexions INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    base.execute(
+        "INSERT OR IGNORE INTO CONNEXION_STATS_GLOBALE (id_unique, total_connexions) VALUES (1, 0)"
+    )
+    lignes_stats = base.execute("SELECT COUNT(*) AS total FROM CONNEXION_STATS_HEURE").fetchone()["total"]
+    if int(lignes_stats) == 0:
+        for h in range(24):
+            base.execute(
+                "INSERT OR IGNORE INTO CONNEXION_STATS_HEURE (heure, nb_connexions) VALUES (?, 0)",
+                (h,),
+            )
+    total_global = int(
+        base.execute(
+            "SELECT total_connexions FROM CONNEXION_STATS_GLOBALE WHERE id_unique = 1"
+        ).fetchone()["total_connexions"]
+    )
+    if total_global == 0:
+        agregats = base.execute(
+            "SELECT CAST(strftime('%H', date_connexion) AS INTEGER) AS heure, COUNT(*) AS total FROM CONNEXION_LOG GROUP BY heure"
+        ).fetchall()
+        somme = 0
+        for ligne in agregats:
+            if ligne["heure"] is None:
+                continue
+            somme += int(ligne["total"])
+            base.execute(
+                "UPDATE CONNEXION_STATS_HEURE SET nb_connexions = ? WHERE heure = ?",
+                (int(ligne["total"]), int(ligne["heure"])),
+            )
+        base.execute(
+            "UPDATE CONNEXION_STATS_GLOBALE SET total_connexions = ? WHERE id_unique = 1",
+            (somme,),
+        )
     base.commit()
 def verifier_connexion():
     if "utilisateur" not in session:
@@ -92,6 +181,7 @@ def verifier_connexion():
 def contexte_global():
     return {
         "utilisateur": session.get("utilisateur"),
+        "admin_connecte": bool(session.get("admin")),
         "menu_categories": categories_menu(),
     }
 @application.route("/")
@@ -140,23 +230,48 @@ def catalogue(slug):
 def cddvd():
     base = bdd()
     assurer_colonne_image_cddvd(base)
+    assurer_colonne_total_exemplaires_cddvd(base)
     recherche = request.args.get("q", "").strip().lower()
     parametres = []
     filtre = ""
     if recherche:
-        filtre = ' WHERE LOWER("nom_CD/DVD") LIKE ? OR LOWER("artiste_CD/DVD") LIKE ?'
+        filtre = ' WHERE LOWER(c."nom_CD/DVD") LIKE ? OR LOWER(c."artiste_CD/DVD") LIKE ?'
         motif = "%" + recherche + "%"
         parametres = [motif, motif]
     liste_cddvd = base.execute(
         """
-        SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd,
-               "annee_CD/DVD" AS annee_cd_dvd, "artiste_CD/DVD" AS artiste_cd_dvd,
-               image
-        FROM "CD/DVD" 
+        SELECT
+            c."id_CD/DVD" AS id_cd_dvd,
+            c."nom_CD/DVD" AS nom_cd_dvd,
+            c."annee_CD/DVD" AS annee_cd_dvd,
+            c."artiste_CD/DVD" AS artiste_cd_dvd,
+            c.image,
+            COALESCE(c.total_exemplaires, 1) AS total_exemplaires,
+            CASE
+                WHEN (
+                    COALESCE(c.total_exemplaires, 1) - (
+                        SELECT COUNT(*)
+                        FROM RESERVATION r
+                        JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+                        WHERE lcd."id_CD/DVD#" = c."id_CD/DVD"
+                          AND r.date_retour_effective IS NULL
+                    )
+                ) < 0 THEN 0
+                ELSE (
+                    COALESCE(c.total_exemplaires, 1) - (
+                        SELECT COUNT(*)
+                        FROM RESERVATION r
+                        JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+                        WHERE lcd."id_CD/DVD#" = c."id_CD/DVD"
+                          AND r.date_retour_effective IS NULL
+                    )
+                )
+            END AS exemplaires_restants
+        FROM "CD/DVD" c
         """
         + filtre
         + """
-        ORDER BY "nom_CD/DVD"
+        ORDER BY c."nom_CD/DVD"
         """,
         parametres,
     ).fetchall()
@@ -181,7 +296,7 @@ def reserver():
             if isbn:
                 livre = base.execute(
                     """
-                    SELECT l.id_livre, l.nom_livre, l.ISBN_livre
+                    SELECT l.id_livre, l.nom_livre, l.ISBN_livre, COALESCE(l.total_exemplaires, 1) AS total_exemplaires
                     FROM LIVRE l
                     WHERE CAST(l.ISBN_livre AS TEXT) = ?
                     ORDER BY l.id_livre LIMIT 1
@@ -191,33 +306,48 @@ def reserver():
                 if not livre:
                     erreur = "Livre introuvable pour cet ISBN."
                 else:
-                    id_reservation = prochain_identifiant(base, "RESERVATION", "id_reservation")
-                    base.execute(
-                        """
-                        INSERT INTO RESERVATION
-                        (id_reservation, date_reservation, date_de_retour, "id_client#", bibliotheque_retrait, date_limite_retour, date_retour_effective)
-                        VALUES (?, ?, NULL, ?, 'Centre-ville', ?, NULL)
-                        """,
-                        (
-                            id_reservation,
-                            date_francaise(date_reservation),
-                            session["utilisateur"]["id"],
-                            date_francaise(date_reservation + timedelta(days=21)),
-                        ),
+                    nb_reservations_actives = int(
+                        base.execute(
+                            """
+                            SELECT COUNT(*)
+                            FROM RESERVATION r
+                            JOIN "LIGNE LIVRE" ll ON ll."id_reservation#" = r.id_reservation
+                            JOIN LIVRE li ON li.id_livre = ll."id_livre#"
+                            WHERE CAST(li.ISBN_livre AS TEXT) = ? AND r.date_retour_effective IS NULL
+                            """,
+                            (isbn,),
+                        ).fetchone()[0]
                     )
-                    base.execute(
-                        """
-                        INSERT INTO "LIGNE LIVRE" ("id_livre#", "id_reservation#")
-                        VALUES (?, ?)
-                        """,
-                        (livre["id_livre"], id_reservation),
-                    )
-                    base.commit()
-                    message = "Réservation enregistrée pour le livre : " + str(livre["nom_livre"])
+                    if nb_reservations_actives >= int(livre["total_exemplaires"] or 1):
+                        erreur = "Livre indisponible : tous les exemplaires sont déjà réservés."
+                    else:
+                        id_reservation = prochain_identifiant(base, "RESERVATION", "id_reservation")
+                        base.execute(
+                            """
+                            INSERT INTO RESERVATION
+                            (id_reservation, date_reservation, date_de_retour, "id_client#", bibliotheque_retrait, date_limite_retour, date_retour_effective)
+                            VALUES (?, ?, NULL, ?, 'Centre-ville', ?, NULL)
+                            """,
+                            (
+                                id_reservation,
+                                date_francaise(date_reservation),
+                                session["utilisateur"]["id"],
+                                date_francaise(date_reservation + timedelta(days=21)),
+                            ),
+                        )
+                        base.execute(
+                            """
+                            INSERT INTO "LIGNE LIVRE" ("id_livre#", "id_reservation#")
+                            VALUES (?, ?)
+                            """,
+                            (livre["id_livre"], id_reservation),
+                        )
+                        base.commit()
+                        message = "Réservation enregistrée pour le livre : " + str(livre["nom_livre"])
             if numero_cd_dvd and not erreur:
                 cd_dvd = base.execute(
                     """
-                    SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd
+                    SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd, COALESCE(total_exemplaires, 1) AS total_exemplaires
                     FROM "CD/DVD"
                     WHERE "id_CD/DVD" = ?
                     """,
@@ -226,29 +356,43 @@ def reserver():
                 if not cd_dvd:
                     erreur = "CD/DVD introuvable pour ce numéro."
                 else:
-                    id_reservation = prochain_identifiant(base, "RESERVATION", "id_reservation")
-                    base.execute(
-                        """
-                        INSERT INTO RESERVATION
-                        (id_reservation, date_reservation, date_de_retour, "id_client#", bibliotheque_retrait, date_limite_retour, date_retour_effective)
-                        VALUES (?, ?, NULL, ?, 'Centre-ville', ?, NULL)
-                        """,
-                        (
-                            id_reservation,
-                            date_francaise(date_reservation),
-                            session["utilisateur"]["id"],
-                            date_francaise(date_reservation + timedelta(days=21)),
-                        ),
+                    nb_reservations_actives_cd = int(
+                        base.execute(
+                            """
+                            SELECT COUNT(*)
+                            FROM RESERVATION r
+                            JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+                            WHERE lcd."id_CD/DVD#" = ? AND r.date_retour_effective IS NULL
+                            """,
+                            (numero_cd_dvd,),
+                        ).fetchone()[0]
                     )
-                    base.execute(
-                        """
-                        INSERT INTO "LIGNE CD/DVD" ("id_CD/DVD#", "id_reservation#", date_de_retour)
-                        VALUES (?, ?, NULL)
-                        """,
-                        (cd_dvd["id_cd_dvd"], id_reservation),
-                    )
-                    base.commit()
-                    message = "Réservation enregistrée pour le CD/DVD : " + str(cd_dvd["nom_cd_dvd"])
+                    if nb_reservations_actives_cd >= int(cd_dvd["total_exemplaires"] or 1):
+                        erreur = "CD/DVD indisponible : tous les exemplaires sont déjà réservés."
+                    else:
+                        id_reservation = prochain_identifiant(base, "RESERVATION", "id_reservation")
+                        base.execute(
+                            """
+                            INSERT INTO RESERVATION
+                            (id_reservation, date_reservation, date_de_retour, "id_client#", bibliotheque_retrait, date_limite_retour, date_retour_effective)
+                            VALUES (?, ?, NULL, ?, 'Centre-ville', ?, NULL)
+                            """,
+                            (
+                                id_reservation,
+                                date_francaise(date_reservation),
+                                session["utilisateur"]["id"],
+                                date_francaise(date_reservation + timedelta(days=21)),
+                            ),
+                        )
+                        base.execute(
+                            """
+                            INSERT INTO "LIGNE CD/DVD" ("id_CD/DVD#", "id_reservation#", date_de_retour)
+                            VALUES (?, ?, NULL)
+                            """,
+                            (cd_dvd["id_cd_dvd"], id_reservation),
+                        )
+                        base.commit()
+                        message = "Réservation enregistrée pour le CD/DVD : " + str(cd_dvd["nom_cd_dvd"])
     historique = base.execute(
         """
         SELECT
@@ -363,6 +507,10 @@ def connexion():
         email = request.form.get("email", "").strip().lower()
         mot_de_passe = request.form.get("password", "")
         if email == "administrateur" and mot_de_passe == "secret":
+            assurer_tables_stats_connexion(base)
+            incrementer_stats_connexion(base, datetime.now())
+            base.commit()
+            session.pop("utilisateur", None)
             session["admin"] = True
             return redirect(url_for("admin"))
         utilisateur = base.execute(
@@ -374,6 +522,7 @@ def connexion():
         elif not check_password_hash(utilisateur["mot_de_passe"], mot_de_passe):
             erreur = "Mot de passe incorrect."
         else:
+            session.pop("admin", None)
             session["utilisateur"] = {
                 "id": utilisateur["id_client"],
                 "prenom": utilisateur["prenom_client"],
@@ -457,25 +606,48 @@ def creer_compte():
 @application.route("/statistiques")
 def autres():
     base = bdd()
+    assurer_tables_stats_connexion(base)
+    nb_clients_web = base.execute("SELECT COUNT(*) AS total FROM CLIENT WHERE mot_de_passe IS NOT NULL").fetchone()["total"]
+    nb_clients_base = base.execute("SELECT COUNT(*) AS total FROM CLIENT").fetchone()["total"]
     image_graphe = None
     info_graphe = "Graphique indisponible."
+    total_connexions = 0
     try:
         import matplotlib.pyplot as plt
-        lignes = base.execute("SELECT strftime('%H', date_connexion) h, COUNT(*) n FROM CONNEXION_LOG GROUP BY h ORDER BY h").fetchall()
-        # Affichage réaliste: uniquement sur les heures d'ouverture, avec un plafond.
-        x = []
-        y = []
+        lignes = base.execute(
+            "SELECT heure, nb_connexions FROM CONNEXION_STATS_HEURE ORDER BY heure"
+        ).fetchall()
+        total_connexions = int(
+            base.execute(
+                "SELECT total_connexions FROM CONNEXION_STATS_GLOBALE WHERE id_unique = 1"
+            ).fetchone()["total_connexions"]
+        )
+        heure_debut = 8
+        heure_fin = 21
+        plafond_connexions = min(20, max(3, int(nb_clients_web * 0.5)))
+        heures = []
+        valeurs_brutes = []
         for ligne in lignes:
-            if ligne["h"] is None:
+            heure = int(ligne["heure"])
+            if heure < heure_debut or heure > heure_fin:
                 continue
-            heure = int(ligne["h"])
-            if heure < 8 or heure > 20:
-                continue
-            x.append("%02d" % heure)
-            y.append(min(int(ligne["n"]), 39))
+            heures.append("%02d" % heure)
+            valeurs_brutes.append(int(ligne["nb_connexions"]))
+        maximum_brut = max(valeurs_brutes) if valeurs_brutes else 0
+        y = []
+        if maximum_brut > 0:
+            for brute in valeurs_brutes:
+                if brute <= 0:
+                    y.append(0)
+                else:
+                    y.append(max(1, int(round((float(brute) / float(maximum_brut)) * float(plafond_connexions)))))
+        else:
+            y = [0 for _ in valeurs_brutes]
         fig, ax = plt.subplots(figsize=(8, 3))
-        ax.bar(x, y, color="#1f5e84")
+        ax.bar(heures, y, color="#1f5e84")
         ax.set_title("Connexions par heure")
+        ax.set_ylabel("Connexions")
+        ax.set_ylim(0, max(plafond_connexions, 1))
         tampon = BytesIO()
         fig.tight_layout()
         fig.savefig(tampon, format="png")
@@ -483,8 +655,6 @@ def autres():
         image_graphe = base64.b64encode(tampon.getvalue()).decode("ascii")
     except Exception:
         pass
-    nb_clients_web = base.execute("SELECT COUNT(*) AS total FROM CLIENT WHERE mot_de_passe IS NOT NULL").fetchone()["total"]
-    nb_clients_base = base.execute("SELECT COUNT(*) AS total FROM CLIENT").fetchone()["total"]
     nb_livres_actifs = base.execute(
         'SELECT COUNT(*) AS total FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll."id_reservation#" = r.id_reservation WHERE r.date_retour_effective IS NULL'
     ).fetchone()["total"]
@@ -511,6 +681,34 @@ def autres():
         item = dict(ligne)
         item["slug_categorie"] = faire_slug(item["nom_categorie"])
         top_livres_formates.append(item)
+    top_cds = base.execute(
+        """
+        SELECT
+            c."nom_CD/DVD" AS nom_cd_dvd,
+            COUNT(*) AS nb_demandes
+        FROM RESERVATION r
+        JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+        JOIN "CD/DVD" c ON c."id_CD/DVD" = lcd."id_CD/DVD#"
+        WHERE COALESCE(TRIM(c."artiste_CD/DVD"), '') <> ''
+        GROUP BY c."id_CD/DVD", c."nom_CD/DVD"
+        ORDER BY nb_demandes DESC, c."nom_CD/DVD" ASC
+        LIMIT 5
+        """
+    ).fetchall()
+    top_dvds = base.execute(
+        """
+        SELECT
+            c."nom_CD/DVD" AS nom_cd_dvd,
+            COUNT(*) AS nb_demandes
+        FROM RESERVATION r
+        JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+        JOIN "CD/DVD" c ON c."id_CD/DVD" = lcd."id_CD/DVD#"
+        WHERE COALESCE(TRIM(c."artiste_CD/DVD"), '') = ''
+        GROUP BY c."id_CD/DVD", c."nom_CD/DVD"
+        ORDER BY nb_demandes DESC, c."nom_CD/DVD" ASC
+        LIMIT 5
+        """
+    ).fetchall()
     return render_template(
         "autres.html",
         graph_image=image_graphe,
@@ -519,6 +717,9 @@ def autres():
         nb_clients_initial=nb_clients_base,
         nb_reservations_actives=nb_livres_actifs + nb_cddvd_actifs,
         top_livres_demandes=top_livres_formates,
+        top_cds_demandes=[dict(x) for x in top_cds],
+        top_dvds_demandes=[dict(x) for x in top_dvds],
+        total_connexions=total_connexions,
     )
 def assurer_table_historique_suppressions(base):
     base.execute(
@@ -544,11 +745,35 @@ def assurer_colonne_total_exemplaires_livre(base):
     if "total_exemplaires" not in colonnes:
         base.execute("ALTER TABLE LIVRE ADD COLUMN total_exemplaires INTEGER")
         base.execute("UPDATE LIVRE SET total_exemplaires = 1 WHERE total_exemplaires IS NULL")
-        base.commit()
+    base.execute("UPDATE LIVRE SET total_exemplaires = 1 WHERE total_exemplaires IS NULL OR total_exemplaires < 1")
+    base.execute("UPDATE LIVRE SET total_exemplaires = 5 WHERE total_exemplaires > 5")
+    base.commit()
 def assurer_colonne_image_cddvd(base):
     colonnes = [ligne["name"] for ligne in base.execute('PRAGMA table_info("CD/DVD")').fetchall()]
     if "image" not in colonnes:
         base.execute('ALTER TABLE "CD/DVD" ADD COLUMN image TEXT')
+        base.commit()
+def assurer_colonne_total_exemplaires_cddvd(base):
+    colonnes = [ligne["name"] for ligne in base.execute('PRAGMA table_info("CD/DVD")').fetchall()]
+    if "total_exemplaires" not in colonnes:
+        base.execute('ALTER TABLE "CD/DVD" ADD COLUMN total_exemplaires INTEGER')
+    lignes = base.execute('SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd, total_exemplaires FROM "CD/DVD"').fetchall()
+    modifie = False
+    for ligne in lignes:
+        total = ligne["total_exemplaires"]
+        if total is None or int(total) < 1:
+            base.execute(
+                'UPDATE "CD/DVD" SET total_exemplaires = ? WHERE "id_CD/DVD" = ?',
+                (stock_initial_cddvd(ligne["nom_cd_dvd"]), ligne["id_cd_dvd"]),
+            )
+            modifie = True
+        elif int(total) > 5:
+            base.execute(
+                'UPDATE "CD/DVD" SET total_exemplaires = 5 WHERE "id_CD/DVD" = ?',
+                (ligne["id_cd_dvd"],),
+            )
+            modifie = True
+    if modifie or "total_exemplaires" not in colonnes:
         base.commit()
 @application.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -558,8 +783,169 @@ def admin():
     assurer_table_historique_suppressions(base)
     assurer_colonne_image_cddvd(base)
     assurer_colonne_total_exemplaires_livre(base)
+    assurer_colonne_total_exemplaires_cddvd(base)
     erreur = None
     message = None
+
+    def restaurer_depuis_suppression(suppression):
+        try:
+            payload = json.loads(suppression["payload_json"])
+        except json.JSONDecodeError:
+            return None, "Historique invalide, restauration impossible."
+        if not payload:
+            return None, "Historique invalide, restauration impossible."
+        if payload.get("mode") == "retrait_exemplaire":
+            try:
+                if suppression["type_media"] == "livre":
+                    isbn = str(suppression["reference_media"])
+                    livre = base.execute(
+                        """
+                        SELECT id_livre, nom_livre, COALESCE(total_exemplaires, 1) AS total_exemplaires
+                        FROM LIVRE
+                        WHERE CAST(ISBN_livre AS TEXT) = ?
+                        ORDER BY id_livre
+                        LIMIT 1
+                        """,
+                        (isbn,),
+                    ).fetchone()
+                    if not livre:
+                        return None, "Restauration impossible : livre introuvable."
+                    if int(livre["total_exemplaires"] or 1) >= 5:
+                        return None, "Stock maximum atteint (5 exemplaires) pour ce livre."
+                    base.execute(
+                        """
+                        UPDATE LIVRE
+                        SET total_exemplaires = COALESCE(total_exemplaires, 1) + 1
+                        WHERE CAST(ISBN_livre AS TEXT) = ?
+                        """,
+                        (isbn,),
+                    )
+                    message_local = "Exemplaire restauré pour le livre : " + str(livre["nom_livre"])
+                else:
+                    numero = str(suppression["reference_media"])
+                    cddvd = base.execute(
+                        """
+                        SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd, COALESCE(total_exemplaires, 1) AS total_exemplaires
+                        FROM "CD/DVD"
+                        WHERE "id_CD/DVD" = ?
+                        """,
+                        (numero,),
+                    ).fetchone()
+                    if not cddvd:
+                        return None, "Restauration impossible : CD/DVD introuvable."
+                    if int(cddvd["total_exemplaires"] or 1) >= 5:
+                        return None, "Stock maximum atteint (5 exemplaires) pour ce CD/DVD."
+                    base.execute(
+                        """
+                        UPDATE "CD/DVD"
+                        SET total_exemplaires = COALESCE(total_exemplaires, 1) + 1
+                        WHERE "id_CD/DVD" = ?
+                        """,
+                        (numero,),
+                    )
+                    message_local = "Exemplaire restauré pour le CD/DVD : " + str(cddvd["nom_cd_dvd"])
+                base.execute(
+                    """
+                    UPDATE SUPPRESSION_LOG
+                    SET restaure = 1, date_restauration = ?
+                    WHERE id_suppression = ?
+                    """,
+                    (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), suppression["id_suppression"]),
+                )
+                base.commit()
+                return message_local, None
+            except Exception as e:
+                return None, "Restauration impossible : " + str(e)
+        try:
+            if suppression["type_media"] == "livre":
+                try:
+                    base.execute(
+                        """
+                        INSERT INTO LIVRE
+                        (id_livre, nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            payload.get("id_livre"),
+                            payload.get("nom_livre"),
+                            payload.get("auteur_livre"),
+                            payload.get("maison_edition_livre"),
+                            payload.get("annee_livre"),
+                            payload.get("id_categorie"),
+                            payload.get("ISBN_livre"),
+                            payload.get("resume"),
+                            payload.get("image"),
+                            int(payload.get("stock_total") or 1),
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    base.execute(
+                        """
+                        INSERT INTO LIVRE
+                        (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            payload.get("nom_livre"),
+                            payload.get("auteur_livre"),
+                            payload.get("maison_edition_livre"),
+                            payload.get("annee_livre"),
+                            payload.get("id_categorie"),
+                            payload.get("ISBN_livre"),
+                            payload.get("resume"),
+                            payload.get("image"),
+                            int(payload.get("stock_total") or 1),
+                        ),
+                    )
+                message_local = "Livre restauré."
+            else:
+                try:
+                    base.execute(
+                        """
+                        INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image, total_exemplaires)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            payload.get("id_cd_dvd"),
+                            payload.get("nom_cd_dvd"),
+                            payload.get("annee_cd_dvd"),
+                            payload.get("artiste_cd_dvd"),
+                            payload.get("image"),
+                            int(payload.get("total_exemplaires") or stock_initial_cddvd(payload.get("nom_cd_dvd"))),
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    prochain_numero = base.execute(
+                        'SELECT COALESCE(MAX(CAST("id_CD/DVD" AS INTEGER)), 0) + 1 AS prochain FROM "CD/DVD"'
+                    ).fetchone()["prochain"]
+                    base.execute(
+                        """
+                        INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image, total_exemplaires)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(prochain_numero),
+                            payload.get("nom_cd_dvd"),
+                            payload.get("annee_cd_dvd"),
+                            payload.get("artiste_cd_dvd"),
+                            payload.get("image"),
+                            int(payload.get("total_exemplaires") or stock_initial_cddvd(payload.get("nom_cd_dvd"))),
+                        ),
+                    )
+                message_local = "CD/DVD restauré."
+            base.execute(
+                """
+                UPDATE SUPPRESSION_LOG
+                SET restaure = 1, date_restauration = ?
+                WHERE id_suppression = ?
+                """,
+                (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), suppression["id_suppression"]),
+            )
+            base.commit()
+            return message_local, None
+        except Exception as e:
+            return None, "Restauration impossible : " + str(e)
+
     if request.method == "POST":
         action = request.form.get("action", "")
         if action == "ajouter":
@@ -625,8 +1011,8 @@ def admin():
                         else:
                             base.execute(
                                 """
-                                INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image)
-                                VALUES (?, ?, ?, ?, ?)
+                                INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image, total_exemplaires)
+                                VALUES (?, ?, ?, ?, ?, ?)
                                 """,
                                 (
                                     int(numero_cd_dvd),
@@ -634,6 +1020,7 @@ def admin():
                                     int(annee_cd_dvd) if annee_cd_dvd else None,
                                     artiste_cd_dvd or None,
                                     image_finale_cddvd,
+                                    stock_initial_cddvd(nom_cd_dvd),
                                 ),
                             )
                     else:
@@ -642,8 +1029,8 @@ def admin():
                         ).fetchone()["prochain"]
                         base.execute(
                             """
-                            INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image)
-                            VALUES (?, ?, ?, ?, ?)
+                            INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image, total_exemplaires)
+                            VALUES (?, ?, ?, ?, ?, ?)
                             """,
                             (
                                 int(prochain_numero),
@@ -651,6 +1038,7 @@ def admin():
                                 int(annee_cd_dvd) if annee_cd_dvd else None,
                                 artiste_cd_dvd or None,
                                 image_finale_cddvd,
+                                stock_initial_cddvd(nom_cd_dvd),
                             ),
                         )
                     if not erreur:
@@ -658,48 +1046,85 @@ def admin():
                         message = "CD/DVD ajouté."
                 except Exception as e:
                     erreur = "Ajout CD/DVD impossible : " + str(e)
-        elif action == "supprimer":
-            isbn_livre = request.form.get("isbn_livre_suppression", "").strip()
-            numero_cd_dvd = request.form.get("numero_cd_dvd_suppression", "").strip()
+        elif action == "supprimer" or (action == "gerer_existant" and request.form.get("operation", "") == "-"):
+            isbn_livre = request.form.get("isbn_livre_suppression", "").strip() or request.form.get("isbn_livre_existant", "").strip()
+            numero_cd_dvd = request.form.get("numero_cd_dvd_suppression", "").strip() or request.form.get("numero_cd_dvd_existant", "").strip()
             if not isbn_livre and not numero_cd_dvd:
                 erreur = "Entre un ISBN livre ou un numéro CD/DVD."
             elif isbn_livre and numero_cd_dvd:
                 erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
             elif isbn_livre:
-                actif = base.execute(
+                livres = base.execute(
                     """
-                    SELECT 1
-                    FROM RESERVATION r
-                    JOIN "LIGNE LIVRE" ll ON ll."id_reservation#" = r.id_reservation
-                    JOIN LIVRE l ON l.id_livre = ll."id_livre#"
-                    WHERE CAST(l.ISBN_livre AS TEXT) = ? AND r.date_retour_effective IS NULL
-                    LIMIT 1
+                    SELECT
+                        id_livre,
+                        nom_livre,
+                        auteur_livre,
+                        maison_edition_livre,
+                        annee_livre,
+                        id_categorie,
+                        ISBN_livre,
+                        resume,
+                        image,
+                        total_exemplaires
+                    FROM LIVRE
+                    WHERE CAST(ISBN_livre AS TEXT) = ?
                     """,
                     (isbn_livre,),
-                ).fetchone()
-                if actif:
-                    erreur = "Suppression impossible : livre actuellement réservé."
+                ).fetchall()
+                if not livres:
+                    erreur = "Aucun livre trouvé pour cet ISBN."
                 else:
-                    livres = base.execute(
-                        """
-                        SELECT
-                            id_livre,
-                            nom_livre,
-                            auteur_livre,
-                            maison_edition_livre,
-                            annee_livre,
-                            id_categorie,
-                            ISBN_livre,
-                            resume,
-                            image,
-                            total_exemplaires
-                        FROM LIVRE
-                        WHERE CAST(ISBN_livre AS TEXT) = ?
-                        """,
-                        (isbn_livre,),
-                    ).fetchall()
-                    if not livres:
-                        erreur = "Aucun livre trouvé pour cet ISBN."
+                    stock_total = int((livres[0]["total_exemplaires"] or 1))
+                    nb_reservations_actives = int(
+                        base.execute(
+                            """
+                            SELECT COUNT(*)
+                            FROM RESERVATION r
+                            JOIN "LIGNE LIVRE" ll ON ll."id_reservation#" = r.id_reservation
+                            JOIN LIVRE l ON l.id_livre = ll."id_livre#"
+                            WHERE CAST(l.ISBN_livre AS TEXT) = ? AND r.date_retour_effective IS NULL
+                            """,
+                            (isbn_livre,),
+                        ).fetchone()[0]
+                    )
+                    if stock_total <= nb_reservations_actives:
+                        erreur = "Suppression impossible : tous les exemplaires de ce livre sont réservés."
+                    elif stock_total > 1:
+                        base.execute(
+                            """
+                            UPDATE LIVRE
+                            SET total_exemplaires = COALESCE(total_exemplaires, 1) - 1
+                            WHERE CAST(ISBN_livre AS TEXT) = ?
+                            """,
+                            (isbn_livre,),
+                        )
+                        base.execute(
+                            """
+                            INSERT INTO SUPPRESSION_LOG
+                            (type_media, reference_media, titre_media, auteur_media, annee_media, id_ligne_origine, payload_json, date_suppression)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                "livre",
+                                str(livres[0]["ISBN_livre"]),
+                                livres[0]["nom_livre"],
+                                livres[0]["auteur_livre"],
+                                str(livres[0]["annee_livre"]) if livres[0]["annee_livre"] is not None else "",
+                                str(livres[0]["id_livre"]),
+                                json.dumps(
+                                    {
+                                        "mode": "retrait_exemplaire",
+                                        "stock_avant": stock_total,
+                                        "stock_apres": stock_total - 1,
+                                    },
+                                    ensure_ascii=True,
+                                ),
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            ),
+                        )
+                        base.commit()
+                        message = "Exemplaire retiré pour le livre : " + str(livres[0]["nom_livre"])
                     else:
                         date_suppression = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         for livre in livres:
@@ -739,34 +1164,68 @@ def admin():
                         base.commit()
                         message = str(len(livres)) + " livre(s) supprimé(s)."
             else:
-                actif = base.execute(
+                cd_dvd = base.execute(
                     """
-                    SELECT 1
-                    FROM RESERVATION r
-                    JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
-                    WHERE lcd."id_CD/DVD#" = ? AND r.date_retour_effective IS NULL
-                    LIMIT 1
+                    SELECT
+                        "id_CD/DVD" AS id_cd_dvd,
+                        "nom_CD/DVD" AS nom_cd_dvd,
+                        "annee_CD/DVD" AS annee_cd_dvd,
+                        "artiste_CD/DVD" AS artiste_cd_dvd,
+                        image,
+                        COALESCE(total_exemplaires, 1) AS total_exemplaires
+                    FROM "CD/DVD"
+                    WHERE "id_CD/DVD" = ?
                     """,
                     (numero_cd_dvd,),
                 ).fetchone()
-                if actif:
-                    erreur = "Suppression impossible : CD/DVD actuellement réservé."
+                if not cd_dvd:
+                    erreur = "Aucun CD/DVD trouvé pour ce numéro."
                 else:
-                    cd_dvd = base.execute(
-                        """
-                        SELECT
-                            "id_CD/DVD" AS id_cd_dvd,
-                            "nom_CD/DVD" AS nom_cd_dvd,
-                            "annee_CD/DVD" AS annee_cd_dvd,
-                            "artiste_CD/DVD" AS artiste_cd_dvd,
-                            image
-                        FROM "CD/DVD"
-                        WHERE "id_CD/DVD" = ?
-                        """,
-                        (numero_cd_dvd,),
-                    ).fetchone()
-                    if not cd_dvd:
-                        erreur = "Aucun CD/DVD trouvé pour ce numéro."
+                    stock_total_cd = int(cd_dvd["total_exemplaires"] or 1)
+                    nb_reservations_actives_cd = int(
+                        base.execute(
+                            """
+                            SELECT COUNT(*)
+                            FROM RESERVATION r
+                            JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#" = r.id_reservation
+                            WHERE lcd."id_CD/DVD#" = ? AND r.date_retour_effective IS NULL
+                            """,
+                            (numero_cd_dvd,),
+                        ).fetchone()[0]
+                    )
+                    if stock_total_cd <= nb_reservations_actives_cd:
+                        erreur = "Suppression impossible : tous les exemplaires de ce CD/DVD sont réservés."
+                    elif stock_total_cd > 1:
+                        base.execute(
+                            'UPDATE "CD/DVD" SET total_exemplaires = COALESCE(total_exemplaires, 1) - 1 WHERE "id_CD/DVD" = ?',
+                            (numero_cd_dvd,),
+                        )
+                        base.execute(
+                            """
+                            INSERT INTO SUPPRESSION_LOG
+                            (type_media, reference_media, titre_media, auteur_media, annee_media, id_ligne_origine, payload_json, date_suppression)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                "cddvd",
+                                str(cd_dvd["id_cd_dvd"]),
+                                cd_dvd["nom_cd_dvd"],
+                                cd_dvd["artiste_cd_dvd"],
+                                str(cd_dvd["annee_cd_dvd"]) if cd_dvd["annee_cd_dvd"] is not None else "",
+                                str(cd_dvd["id_cd_dvd"]),
+                                json.dumps(
+                                    {
+                                        "mode": "retrait_exemplaire",
+                                        "stock_avant": stock_total_cd,
+                                        "stock_apres": stock_total_cd - 1,
+                                    },
+                                    ensure_ascii=True,
+                                ),
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            ),
+                        )
+                        base.commit()
+                        message = "Exemplaire retiré pour le CD/DVD : " + str(cd_dvd["nom_cd_dvd"])
                     else:
                         payload = {
                             "id_cd_dvd": cd_dvd["id_cd_dvd"],
@@ -774,6 +1233,7 @@ def admin():
                             "annee_cd_dvd": cd_dvd["annee_cd_dvd"],
                             "artiste_cd_dvd": cd_dvd["artiste_cd_dvd"],
                             "image": cd_dvd["image"],
+                            "total_exemplaires": int(cd_dvd["total_exemplaires"] or 1),
                         }
                         base.execute(
                             """
@@ -798,6 +1258,101 @@ def admin():
                         )
                         base.commit()
                         message = "CD/DVD supprimé."
+        elif action == "gerer_existant":
+            operation = request.form.get("operation", "").strip()
+            isbn_livre = request.form.get("isbn_livre_existant", "").strip()
+            numero_cd_dvd = request.form.get("numero_cd_dvd_existant", "").strip()
+            if not isbn_livre and not numero_cd_dvd:
+                erreur = "Entre un ISBN livre ou un numéro CD/DVD."
+            elif isbn_livre and numero_cd_dvd:
+                erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
+            elif operation != "+":
+                erreur = "Choisis + pour ajouter/restaurer ou - pour supprimer."
+            elif isbn_livre:
+                livre_existant = base.execute(
+                    """
+                    SELECT
+                        nom_livre,
+                        COALESCE(total_exemplaires, 1) AS total_exemplaires
+                    FROM LIVRE
+                    WHERE CAST(ISBN_livre AS TEXT) = ?
+                    ORDER BY id_livre
+                    LIMIT 1
+                    """,
+                    (isbn_livre,),
+                ).fetchone()
+                if livre_existant:
+                    if int(livre_existant["total_exemplaires"] or 1) >= 5:
+                        erreur = "Stock maximum atteint (5 exemplaires) pour ce livre."
+                    else:
+                        base.execute(
+                            """
+                            UPDATE LIVRE
+                            SET total_exemplaires = COALESCE(total_exemplaires, 1) + 1
+                            WHERE CAST(ISBN_livre AS TEXT) = ?
+                            """,
+                            (isbn_livre,),
+                        )
+                        base.commit()
+                        message = "Exemplaire ajouté pour le livre : " + str(livre_existant["nom_livre"])
+                else:
+                    suppression = base.execute(
+                        """
+                        SELECT *
+                        FROM SUPPRESSION_LOG
+                        WHERE restaure = 0 AND type_media = 'livre' AND reference_media = ?
+                        ORDER BY id_suppression DESC
+                        LIMIT 1
+                        """,
+                        (isbn_livre,),
+                    ).fetchone()
+                    if not suppression:
+                        erreur = "Aucun livre trouvé pour cet ISBN."
+                    else:
+                        message, erreur = restaurer_depuis_suppression(suppression)
+            else:
+                cddvd_existant = base.execute(
+                    """
+                    SELECT
+                        "nom_CD/DVD" AS nom_cd_dvd,
+                        "annee_CD/DVD" AS annee_cd_dvd,
+                        "artiste_CD/DVD" AS artiste_cd_dvd,
+                        image,
+                        COALESCE(total_exemplaires, 1) AS total_exemplaires
+                    FROM "CD/DVD"
+                    WHERE "id_CD/DVD" = ?
+                    """,
+                    (numero_cd_dvd,),
+                ).fetchone()
+                if cddvd_existant:
+                    if int(cddvd_existant["total_exemplaires"] or 1) >= 5:
+                        erreur = "Stock maximum atteint (5 exemplaires) pour ce CD/DVD."
+                    else:
+                        base.execute(
+                            """
+                            UPDATE "CD/DVD"
+                            SET total_exemplaires = COALESCE(total_exemplaires, 1) + 1
+                            WHERE "id_CD/DVD" = ?
+                            """,
+                            (numero_cd_dvd,),
+                        )
+                        base.commit()
+                        message = "Exemplaire ajouté pour le CD/DVD : " + str(cddvd_existant["nom_cd_dvd"])
+                else:
+                    suppression = base.execute(
+                        """
+                        SELECT *
+                        FROM SUPPRESSION_LOG
+                        WHERE restaure = 0 AND type_media = 'cddvd' AND reference_media = ?
+                        ORDER BY id_suppression DESC
+                        LIMIT 1
+                        """,
+                        (numero_cd_dvd,),
+                    ).fetchone()
+                    if not suppression:
+                        erreur = "Aucun CD/DVD trouvé pour ce numéro."
+                    else:
+                        message, erreur = restaurer_depuis_suppression(suppression)
         elif action == "restaurer":
             id_suppression = request.form.get("id_suppression", "").strip()
             if not id_suppression:
@@ -810,99 +1365,7 @@ def admin():
                 if not suppression:
                     erreur = "Cet élément est déjà restauré ou introuvable."
                 else:
-                    try:
-                        payload = json.loads(suppression["payload_json"])
-                    except json.JSONDecodeError:
-                        payload = None
-                    if not payload:
-                        erreur = "Historique invalide, restauration impossible."
-                    else:
-                        try:
-                            if suppression["type_media"] == "livre":
-                                try:
-                                    base.execute(
-                                        """
-                                        INSERT INTO LIVRE
-                                        (id_livre, nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                        """,
-                                        (
-                                            payload.get("id_livre"),
-                                            payload.get("nom_livre"),
-                                            payload.get("auteur_livre"),
-                                            payload.get("maison_edition_livre"),
-                                            payload.get("annee_livre"),
-                                            payload.get("id_categorie"),
-                                            payload.get("ISBN_livre"),
-                                            payload.get("resume"),
-                                            payload.get("image"),
-                                            int(payload.get("stock_total") or 1),
-                                        ),
-                                    )
-                                except sqlite3.IntegrityError:
-                                    base.execute(
-                                        """
-                                        INSERT INTO LIVRE
-                                        (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                        """,
-                                        (
-                                            payload.get("nom_livre"),
-                                            payload.get("auteur_livre"),
-                                            payload.get("maison_edition_livre"),
-                                            payload.get("annee_livre"),
-                                            payload.get("id_categorie"),
-                                            payload.get("ISBN_livre"),
-                                            payload.get("resume"),
-                                            payload.get("image"),
-                                            int(payload.get("stock_total") or 1),
-                                        ),
-                                    )
-                                message = "Livre restauré."
-                            else:
-                                try:
-                                    base.execute(
-                                        """
-                                        INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image)
-                                        VALUES (?, ?, ?, ?, ?)
-                                        """,
-                                        (
-                                            payload.get("id_cd_dvd"),
-                                            payload.get("nom_cd_dvd"),
-                                            payload.get("annee_cd_dvd"),
-                                            payload.get("artiste_cd_dvd"),
-                                            payload.get("image"),
-                                        ),
-                                    )
-                                except sqlite3.IntegrityError:
-                                    prochain_numero = base.execute(
-                                        'SELECT COALESCE(MAX(CAST("id_CD/DVD" AS INTEGER)), 0) + 1 AS prochain FROM "CD/DVD"'
-                                    ).fetchone()["prochain"]
-                                    base.execute(
-                                        """
-                                        INSERT INTO "CD/DVD" ("id_CD/DVD", "nom_CD/DVD", "annee_CD/DVD", "artiste_CD/DVD", image)
-                                        VALUES (?, ?, ?, ?, ?)
-                                        """,
-                                        (
-                                            int(prochain_numero),
-                                            payload.get("nom_cd_dvd"),
-                                            payload.get("annee_cd_dvd"),
-                                            payload.get("artiste_cd_dvd"),
-                                            payload.get("image"),
-                                        ),
-                                    )
-                                message = "CD/DVD restauré."
-                            base.execute(
-                                """
-                                UPDATE SUPPRESSION_LOG
-                                SET restaure = 1, date_restauration = ?
-                                WHERE id_suppression = ?
-                                """,
-                                (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), id_suppression),
-                            )
-                            base.commit()
-                        except Exception as e:
-                            erreur = "Restauration impossible : " + str(e)
+                    message, erreur = restaurer_depuis_suppression(suppression)
     categories = base.execute("SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY id_categorie").fetchall()
     suggestions_images_livres = {}
     for cat in categories:
@@ -933,22 +1396,24 @@ def admin():
             titre_media,
             auteur_media,
             annee_media,
-            date_suppression
+            date_suppression,
+            restaure,
+            date_restauration
         FROM SUPPRESSION_LOG
-        WHERE restaure = 0
-        ORDER BY id_suppression DESC
-        LIMIT ?
+        WHERE 1=1
         """
         + filtre
         + """
+        ORDER BY id_suppression DESC
+        LIMIT ?
         """,
-        [*parametres, limite],
+        [*parametres, int(limite)],
     ).fetchall()
     total_suppressions = base.execute(
         """
         SELECT COUNT(*) AS total
         FROM SUPPRESSION_LOG
-        WHERE restaure = 0
+        WHERE 1=1
         """
         + filtre
         + """
@@ -969,8 +1434,7 @@ def admin():
     )
 @application.route("/deconnexion")
 def deconnexion():
-    session.pop("utilisateur", None)
-    session.pop("admin", None)
+    session.clear()
     return redirect(url_for("accueil"))
 if __name__ == "__main__":
     application.run(debug=True)

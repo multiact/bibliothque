@@ -38,7 +38,11 @@
         <a class="lien-menu" href="[[ url_for('rendre') ]]">Rendre</a>
         <a class="lien-menu" href="[[ url_for('autres') ]]">Autres</a>
 
-        [% if utilisateur %]
+        [% if admin_connecte %]
+            <a class="lien-menu" href="[[ url_for('admin') ]]">Administration</a>
+            <span class="lien-menu">Bienvenue Administrateur</span>
+            <a class="lien-menu bouton-connexion" href="[[ url_for('deconnexion') ]]">Déconnexion</a>
+        [% elif utilisateur %]
             <a class="lien-menu" href="[[ url_for('mes_reservations') ]]">Mon compte</a>
             <span class="lien-menu">Bonjour [[ utilisateur.prenom ]]</span>
             <a class="lien-menu bouton-connexion" href="[[ url_for('deconnexion') ]]">Déconnexion</a>
