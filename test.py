@@ -17,6 +17,7 @@ application.jinja_env.block_end_string = "%]"
 BASE_DONNEES = "bibliotheque.db"
 DOSSIER_COUVERTURES = os.path.join("static", "couvertures")
 def bdd():
+    # Une connexion SQLite par requête Flask, stockée dans `g` pour réutilisation locale.
     if "bdd" not in g:
         g.bdd = sqlite3.connect(BASE_DONNEES)
         g.bdd.row_factory = sqlite3.Row
@@ -55,6 +56,7 @@ def prochain_nom_image_cddvd(base):
     total = base.execute('SELECT COUNT(*) AS total FROM "CD/DVD"').fetchone()["total"]
     return "cddvd_%02d.jpg" % (int(total) + 1)
 def stock_initial_cddvd(nom_cd_dvd):
+    # Stock initial pseudo-aléatoire mais stable par titre (même titre => même base de stock).
     nom_normalise = unicodedata.normalize("NFKD", str(nom_cd_dvd)).encode("ascii", "ignore").decode("ascii").lower().strip()
     cddvd_tres_connus = {
         "thriller",
@@ -108,6 +110,7 @@ def ajouter_log_connexion(id_client):
 def incrementer_stats_connexion(base, instant=None):
     moment = instant or datetime.now()
     heure = int(moment.strftime("%H"))
+    # UPSERT SQLite: crée la ligne horaire si absente, sinon incrémente directement.
     base.execute(
         """
         INSERT INTO CONNEXION_STATS_HEURE (heure, nb_connexions)
@@ -124,6 +127,7 @@ def incrementer_stats_connexion(base, instant=None):
         """,
     )
 def assurer_tables_stats_connexion(base):
+    # Tables de stats indépendantes de CONNEXION_LOG pour un accès rapide au graphe.
     base.execute(
         """
         CREATE TABLE IF NOT EXISTS CONNEXION_STATS_HEURE (
@@ -156,6 +160,7 @@ def assurer_tables_stats_connexion(base):
         ).fetchone()["total_connexions"]
     )
     if total_global == 0:
+        # Migration douce: si les stats sont vides, on reconstruit à partir de l'historique brut.
         agregats = base.execute(
             "SELECT CAST(strftime('%H', date_connexion) AS INTEGER) AS heure, COUNT(*) AS total FROM CONNEXION_LOG GROUP BY heure"
         ).fetchall()
@@ -306,6 +311,7 @@ def reserver():
                 if not livre:
                     erreur = "Livre introuvable pour cet ISBN."
                 else:
+                    # On compare demandes actives vs stock total pour éviter la surréservation.
                     nb_reservations_actives = int(
                         base.execute(
                             """
@@ -356,6 +362,7 @@ def reserver():
                 if not cd_dvd:
                     erreur = "CD/DVD introuvable pour ce numéro."
                 else:
+                    # Même logique de disponibilité pour CD/DVD.
                     nb_reservations_actives_cd = int(
                         base.execute(
                             """
@@ -507,6 +514,7 @@ def connexion():
         email = request.form.get("email", "").strip().lower()
         mot_de_passe = request.form.get("password", "")
         if email == "administrateur" and mot_de_passe == "secret":
+            # Les connexions admin comptent aussi dans les stats horaires.
             assurer_tables_stats_connexion(base)
             incrementer_stats_connexion(base, datetime.now())
             base.commit()
@@ -624,6 +632,7 @@ def autres():
         )
         heure_debut = 8
         heure_fin = 21
+        # Graphe borné aux heures d'ouverture + plafonné pour rester lisible visuellement.
         plafond_connexions = min(20, max(3, int(nb_clients_web * 0.5)))
         heures = []
         valeurs_brutes = []
@@ -636,6 +645,7 @@ def autres():
         maximum_brut = max(valeurs_brutes) if valeurs_brutes else 0
         y = []
         if maximum_brut > 0:
+            # Mise à l'échelle relative: on garde des pics/creux même avec beaucoup de connexions.
             for brute in valeurs_brutes:
                 if brute <= 0:
                     y.append(0)
@@ -795,6 +805,7 @@ def admin():
         if not payload:
             return None, "Historique invalide, restauration impossible."
         if payload.get("mode") == "retrait_exemplaire":
+            # Cas 1: restauration d'un retrait de stock (on remonte juste `total_exemplaires`).
             try:
                 if suppression["type_media"] == "livre":
                     isbn = str(suppression["reference_media"])
@@ -857,6 +868,7 @@ def admin():
             except Exception as e:
                 return None, "Restauration impossible : " + str(e)
         try:
+            # Cas 2: restauration d'une suppression complète (réinsertion de la ligne supprimée).
             if suppression["type_media"] == "livre":
                 try:
                     base.execute(
@@ -1091,6 +1103,7 @@ def admin():
                     if stock_total <= nb_reservations_actives:
                         erreur = "Suppression impossible : tous les exemplaires de ce livre sont réservés."
                     elif stock_total > 1:
+                        # Suppression partielle: on retire un exemplaire mais on garde le média en catalogue.
                         base.execute(
                             """
                             UPDATE LIVRE
@@ -1126,6 +1139,7 @@ def admin():
                         base.commit()
                         message = "Exemplaire retiré pour le livre : " + str(livres[0]["nom_livre"])
                     else:
+                        # Suppression totale: dernier exemplaire, on archive dans l'historique puis on supprime la ligne.
                         date_suppression = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         for livre in livres:
                             payload = {
