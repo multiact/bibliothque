@@ -12,25 +12,25 @@
         <p>[[ nb_clients_initial ]]</p>
     </div>
     <div class="bloc">
-        <h3>R&eacute;servations actives</h3>
+        <h3>Réservations actives</h3>
         <p>[[ nb_reservations_actives ]]</p>
     </div>
 </div>
 
-<h2>&Eacute;quipe</h2>
-<p>La grande g&eacute;rante de la biblioth&egrave;que est <strong>Lisette Baccega</strong>.</p>
+<h2>Équipe</h2>
+<h2>La grande gérante de la bibliothèque est <strong>Lisette Baccega</strong>.</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
             <tr>
                 <th>Nom</th>
-                <th>R&ocirc;le</th>
+                <th>Rôle</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>Yael Lunven</td>
-                <td>Responsable des r&eacute;servations</td>
+                <td>Responsable des réservations</td>
             </tr>
             <tr>
                 <td>Quentin Laverdure</td>
@@ -56,7 +56,7 @@
 <div class="message-erreur">[[ graph_info ]]</div>
 [% endif %]
 
-<h2>Top 10 livres les plus demand&eacute;s</h2>
+<h2>Top 10 livres les plus demandés</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
@@ -74,7 +74,7 @@
                 <td>[[ livre["nom_livre"] ]]</td>
                 <td>[[ livre["nb_demandes"] ]]</td>
                 <td>
-                    <a href="[[ url_for('catalogue', slug=livre['slug_categorie'], q=livre['nom_livre']) ]]">Voir ce livre</a>
+                    <a href="/catalogue/[[ livre['slug_categorie'] ]]?q=[[ livre['nom_livre']|urlencode ]]">Voir ce livre</a>
                 </td>
             </tr>
             [% else %]
@@ -93,28 +93,28 @@
             <tr>
                 <th>Service</th>
                 <th>Contact</th>
-                <th>Disponibilit&eacute;</th>
+                <th>Disponibilité</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>Accueil biblioth&egrave;que</td>
-                <td>04 75 00 00 00 - bibliothequedevalence@gmail.com</td>
-                <td>Mardi &agrave; dimanche</td>
+                <td>Accueil bibliothèque</td>
+                <td>06 07 75 67 42 - bibliothequedevalence@gmail.com</td>
+                <td>Mardi à dimanche</td>
             </tr>
             <tr>
-                <td>R&eacute;servations</td>
-                <td>04 75 00 00 01 - bibliothequedevalence@gmail.com</td>
+                <td>Réservations</td>
+                <td>06 07 75 67 42 - bibliothequedevalence@gmail.com</td>
                 <td>9h00 - 18h00</td>
             </tr>
             <tr>
                 <td>Support compte</td>
-                <td>04 75 00 00 02 - bibliothequedevalence@gmail.com</td>
+                <td>06 07 75 67 42 - bibliothequedevalence@gmail.com</td>
                 <td>8h30 - 17h30</td>
             </tr>
             <tr>
                 <td>Adresse</td>
-                <td>Biblioth&egrave;que Centre-ville, 1 avenue du Champ de Mars, 26000 Valence</td>
+                <td>Bibliothèque Centre-ville, 1 avenue du Champ de Mars, 26000 Valence</td>
                 <td>Ouvert au public</td>
             </tr>
         </tbody>

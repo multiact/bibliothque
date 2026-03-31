@@ -123,10 +123,10 @@ def catalogue(slug):
             exemplaires_restants
         FROM VUE_CATALOGUE_LIVRES
         WHERE id_categorie = ? 
-        ORDER BY nom_livre
         """
         + filtre
         + """
+        ORDER BY nom_livre
         """,
         parametres,
     ).fetchall()
@@ -153,10 +153,10 @@ def cddvd():
                "annee_CD/DVD" AS annee_cd_dvd, "artiste_CD/DVD" AS artiste_cd_dvd,
                image
         FROM "CD/DVD" 
-        ORDER BY "nom_CD/DVD"
         """
         + filtre
         + """
+        ORDER BY "nom_CD/DVD"
         """,
         parametres,
     ).fetchall()
