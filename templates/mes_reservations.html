@@ -1,0 +1,50 @@
+[% extends "base.html" %]
+
+[% block title %]Mes réservations[% endblock %]
+
+[% block content %]
+<h1>Mes réservations</h1>
+
+<div class="table-conteneur">
+    <table class="tableau-horaires">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Titre</th>
+                <th>Auteur/Artiste</th>
+                <th>Référence</th>
+                <th>Date réservation</th>
+                <th>Date limite de retour</th>
+                <th>Retrait</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% for r in reservations %]
+            <tr>
+                <td>[[ r['id_reservation'] ]]</td>
+                <td>[[ r['type_media'] ]]</td>
+                <td>[[ r['nom_media'] ]]</td>
+                <td>[[ r['auteur_media'] or '-' ]]</td>
+                <td>[[ r['reference_media'] ]]</td>
+                <td>[[ r['date_reservation'] ]]</td>
+                <td>[[ r['date_limite_retour'] or '-' ]]</td>
+                <td>[[ r['bibliotheque_retrait'] ]]</td>
+                <td>
+                    [% if r['date_retour_effective'] %]
+                        Rendue le [[ r['date_retour_effective'] ]]
+                    [% else %]
+                        En cours
+                    [% endif %]
+                </td>
+            </tr>
+            [% else %]
+            <tr>
+                <td colspan="9">Aucune réservation pour le moment.</td>
+            </tr>
+            [% endfor %]
+        </tbody>
+    </table>
+</div>
+[% endblock %]

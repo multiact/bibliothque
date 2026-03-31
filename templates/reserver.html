@@ -1,116 +1,82 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Réserver un livre</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
-</head>
-<body>
+[% extends "base.html" %]
 
-<header class="entete">
-    <div class="bloc-logo">
-        <div class="logo">📚</div>
-        <div>
-            <div class="nom-biblio">Bibliothèque de Valence</div>
-            <div class="sous-titre">Centre-ville</div>
-        </div>
-    </div>
+[% block title %]Réserver[% endblock %]
 
-    <nav class="menu">
-        <a class="lien-menu" href="{{ url_for('accueil') }}">Accueil</a>
+[% block content %]
+<h1>Réserver</h1>
+<p>Livre : entre l'ISBN. CD/DVD : entre le numéro. Retrait unique : Centre-ville.</p>
+<p>Règles : réservation possible jusqu'à 1 mois maximum, durée de prêt limitée à 3 semaines.</p>
 
-        <div class="menu-deroulant">
-            <button class="bouton-menu" type="button">Catalogue</button>
+[% if erreur %]
+<div class="message-erreur">[[ erreur ]]</div>
+[% endif %]
+[% if message %]
+<div class="message-valide">[[ message ]]</div>
+[% endif %]
 
-            <div class="contenu-menu">
-                <div class="sous-menu">
-                    <button class="titre-sous-menu" type="button">Livres</button>
-
-                    <div class="contenu-sous-menu">
-                        <a href="{{ url_for('catalogue', categorie='romans') }}">Romans classiques</a>
-                        <a href="{{ url_for('catalogue', categorie='jeunesse') }}">Jeunesse</a>
-                        <a href="{{ url_for('catalogue', categorie='Horreur') }}">Horreur</a>
-                        <a href="{{ url_for('catalogue', categorie='scifiction') }}">Science-fiction</a>
-                        <a href="{{ url_for('catalogue', categorie='Trilleur') }}">Thriller</a>
-                        <a href="{{ url_for('catalogue', categorie='devperso') }}">Développement personnel</a>
-                        <a href="{{ url_for('catalogue', categorie='Biographie') }}">Biographie</a>
-                        <a href="{{ url_for('catalogue', categorie='bd') }}">BD / mangas</a>
-                        <a href="{{ url_for('catalogue', categorie='documentaires') }}">Documentaires</a>
-                    </div>
-                </div>
-
-                <a href="{{ url_for('cddvd') }}">CD / DVD</a>
+<div class="formulaire">
+    <form method="POST" action="[[ url_for('reserver') ]]">
+        <div class="grille-formulaire">
+            <div class="champ-formulaire grand">
+                <label for="isbn">ISBN du livre</label>
+                <input type="text" id="isbn" name="isbn">
+            </div>
+            <div class="champ-formulaire grand">
+                <label for="numero_cd_dvd">Numéro du CD/DVD</label>
+                <input type="number" id="numero_cd_dvd" name="numero_cd_dvd" min="1">
+            </div>
+            <div class="champ-formulaire">
+                <label for="date_reservation">Date de réservation</label>
+                <input type="date" id="date_reservation" name="date_reservation">
+            </div>
+            <div class="champ-formulaire">
+                <label for="bibliotheque">Bibliothèque de retrait</label>
+                <input type="text" id="bibliotheque" value="Centre-ville" disabled>
+            </div>
+            <div class="champ-formulaire grand">
+                <button type="submit">Valider la réservation</button>
             </div>
         </div>
+    </form>
+</div>
 
-        <a class="lien-menu" href="{{ url_for('reserver') }}">Réserver un livre</a>
-        <a class="lien-menu" href="{{ url_for('rendre') }}">Rendre un livre</a>
-
-        {% if utilisateur %}
-            <span class="lien-menu">Bonjour {{ utilisateur.prenom }}</span>
-            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
-        {% else %}
-            <a class="lien-menu bouton-connexion" href="{{ url_for('connexion') }}">Connexion</a>
-        {% endif %}
-    </nav>
-</header>
-
-<main class="conteneur">
-    <section class="bloc-principal">
-        <h1>Réserver un livre</h1>
-        <p>Remplis ce formulaire pour réserver un livre avec son ISBN.</p>
-
-        {% if erreur %}
-            <div class="message-erreur">
-                {{ erreur }}
-            </div>
-        {% endif %}
-
-        {% if message %}
-            <div class="message-valide">
-                {{ message }}
-            </div>
-        {% endif %}
-
-        <div class="formulaire">
-            <form method="POST" action="{{ url_for('reserver') }}">
-                <div class="grille-formulaire">
-
-                    <div class="champ-formulaire grand">
-                        <label for="isbn">ISBN du livre</label>
-                        <input type="text" id="isbn" name="isbn" required>
-                    </div>
-
-                    <div class="champ-formulaire">
-                        <label for="date_reservation">Date de réservation</label>
-                        <input type="date" id="date_reservation" name="date_reservation">
-                    </div>
-
-                    <div class="champ-formulaire">
-                        <label for="bibliotheque">Bibliothèque de retrait</label>
-                        <select id="bibliotheque" name="bibliotheque">
-                            <option>Centre-ville</option>
-                            <option>Valence Sud</option>
-                            <option>Valence Est</option>
-                            <option>Valence Nord</option>
-                            <option>Valence Ouest</option>
-                        </select>
-                    </div>
-
-                    <div class="champ-formulaire grand">
-                        <button type="submit">Valider la réservation</button>
-                    </div>
-
-                </div>
-            </form>
-        </div>
-    </section>
-</main>
-
-<footer class="pied-page">
-    <p>2026 Bibliothèque de Valence</p>
-</footer>
-
-</body>
-</html>
+<h2>Historique de mes réservations</h2>
+<div class="table-conteneur">
+    <table class="tableau-horaires">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Titre</th>
+                <th>Référence</th>
+                <th>Date de réservation</th>
+                <th>Date limite de retour</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% for r in historique %]
+            <tr>
+                <td>[[ r["id_reservation"] ]]</td>
+                <td>[[ r["type_media"] ]]</td>
+                <td>[[ r["nom_media"] ]]</td>
+                <td>[[ r["reference_media"] ]]</td>
+                <td>[[ r["date_reservation"] ]]</td>
+                <td>[[ r["date_limite_retour"] or "-" ]]</td>
+                <td>
+                    [% if r["date_retour_effective"] %]
+                        Rendue le [[ r["date_retour_effective"] ]]
+                    [% else %]
+                        En cours
+                    [% endif %]
+                </td>
+            </tr>
+            [% else %]
+            <tr>
+                <td colspan="7">Aucune réservation pour le moment.</td>
+            </tr>
+            [% endfor %]
+        </tbody>
+    </table>
+</div>
+[% endblock %]

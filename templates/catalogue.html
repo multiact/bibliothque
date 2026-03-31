@@ -1,90 +1,38 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Catalogue</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
-</head>
-<body>
+﻿[% extends "base.html" %]
 
-<header class="entete">
-    <div class="bloc-logo">
-        <div class="logo">📚</div>
-        <div>
-            <div class="nom-biblio">Bibliothèque de Valence</div>
-            <div class="sous-titre">Centre-ville</div>
-        </div>
+[% block title %]Catalogue - [[ categorie.nom ]][% endblock %]
+
+[% block content %]
+<h1>Catalogue : [[ categorie.nom ]]</h1>
+
+<form method="GET" class="barre-recherche">
+    <input type="text" name="q" value="[[ recherche ]]" placeholder="Rechercher un livre, auteur ou ISBN">
+    <button type="submit">Rechercher</button>
+</form>
+
+<div class="liste-livres">
+    [% for livre in livres %]
+    <div class="bloc-livre">
+        [% if livre['image'] %]
+            <img src="[[ url_for('static', filename=(livre['image'] if '/' in livre['image'] else 'couvertures/' ~ livre['image'])) ]]" alt="Couverture [[ livre['nom_livre'] ]]" class="image-livre">
+        [% else %]
+            <div class="image-livre image-vide">Pas de couverture</div>
+        [% endif %]
+
+        <h3>[[ livre["nom_livre"] ]]</h3>
+        <p><strong>Auteur :</strong> [[ livre["auteur_livre"] ]]</p>
+        <p><strong>ISBN :</strong> [[ livre["ISBN_livre"] ]]</p>
+        <p><strong>Exemplaires restants :</strong> [[ livre["exemplaires_restants"] ]] / [[ livre["total_exemplaires"] ]]</p>
+        <p>[[ livre["resume"] or "Résumé non renseigné." ]]</p>
+
+        [% if livre["disponible"] == 1 %]
+            <p class="disponible">Disponible</p>
+        [% else %]
+            <p class="indisponible">Indisponible</p>
+        [% endif %]
     </div>
-
-    <nav class="menu">
-        <a class="lien-menu" href="{{ url_for('accueil') }}">Accueil</a>
-
-        <div class="menu-deroulant">
-            <button class="bouton-menu" type="button">Catalogue</button>
-
-            <div class="contenu-menu">
-                <div class="sous-menu">
-                    <button class="titre-sous-menu" type="button">Livres</button>
-
-                    <div class="contenu-sous-menu">
-                        <a href="{{ url_for('catalogue', categorie='romans') }}">Romans classiques</a>
-                        <a href="{{ url_for('catalogue', categorie='jeunesse') }}">Jeunesse</a>
-                        <a href="{{ url_for('catalogue', categorie='Horreur') }}">Horreur</a>
-                        <a href="{{ url_for('catalogue', categorie='scifiction') }}">Science-fiction</a>
-                        <a href="{{ url_for('catalogue', categorie='Trilleur') }}">Thriller</a>
-                        <a href="{{ url_for('catalogue', categorie='devperso') }}">Développement personnel</a>
-                        <a href="{{ url_for('catalogue', categorie='Biographie') }}">Biographie</a>
-                        <a href="{{ url_for('catalogue', categorie='bd') }}">BD / mangas</a>
-                        <a href="{{ url_for('catalogue', categorie='documentaires') }}">Documentaires</a>
-                    </div>
-                </div>
-
-                <a href="{{ url_for('cddvd') }}">CD / DVD</a>
-            </div>
-        </div>
-
-        <a class="lien-menu" href="{{ url_for('reserver') }}">Réserver un livre</a>
-        <a class="lien-menu" href="{{ url_for('rendre') }}">Rendre un livre</a>
-
-        {% if utilisateur %}
-            <span class="lien-menu">Bonjour {{ utilisateur.prenom }}</span>
-            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
-        {% else %}
-            <a class="lien-menu bouton-connexion" href="{{ url_for('connexion') }}">Connexion</a>
-        {% endif %}
-    </nav>
-</header>
-
-<main class="conteneur">
-    <section class="bloc-principal">
-        <h1>Catalogue : {{ categorie }}</h1>
-
-        <div class="liste-livres">
-            {% for livre in livres %}
-                <div class="bloc-livre">
-                    <img src="{{ url_for('static', filename=livre['image']) }}" alt="Couverture de {{ livre['titre'] }}" class="image-livre">
-
-                    <h3>{{ livre["titre"] }}</h3>
-                    <p><strong>Auteur :</strong> {{ livre["auteur"] }}</p>
-                    <p><strong>ISBN :</strong> {{ livre["isbn"] }}</p>
-                    <p>{{ livre["resume"] }}</p>
-
-                    {% if livre["disponible"] == 1 %}
-                        <p class="disponible">Disponible</p>
-                    {% else %}
-                        <p class="indisponible">Déjà réservé</p>
-                    {% endif %}
-                </div>
-            {% endfor %}
-        </div>
-    </section>
-</main>
-
-
-<footer class="pied-page">
-    <p>2026 Bibliothèque de Valence</p>
-</footer>
-
-</body>
-</html>
+    [% else %]
+    <p>Aucun livre trouvé pour cette recherche.</p>
+    [% endfor %]
+</div>
+[% endblock %]
