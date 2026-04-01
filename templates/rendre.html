@@ -1,27 +1,27 @@
-ï»¿[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Rendre[% endblock %]
+{% block title %}Rendre{% endblock %}
 
-[% block content %]
+{% block content %}
 <h1>Rendre</h1>
-<p>Entre l'ISBN du livre ou le numÃ©ro du CD/DVD rÃ©servÃ©.</p>
+<p>Entre l'ISBN du livre ou le numéro du CD/DVD réservé.</p>
 
-[% if erreur %]
-<div class="message-erreur">[[ erreur ]]</div>
-[% endif %]
-[% if message %]
-<div class="message-valide">[[ message ]]</div>
-[% endif %]
+{% if erreur %}
+<div class="message-erreur">{{ erreur }}</div>
+{% endif %}
+{% if message %}
+<div class="message-valide">{{ message }}</div>
+{% endif %}
 
 <div class="formulaire">
-    <form method="POST" action="[[ url_for('rendre') ]]">
+    <form method="POST" action="{{ url_for('rendre') }}">
         <div class="grille-formulaire">
             <div class="champ-formulaire grand">
                 <label for="isbn">ISBN du livre</label>
                 <input type="text" id="isbn" name="isbn">
             </div>
             <div class="champ-formulaire grand">
-                <label for="numero_cd_dvd">NumÃ©ro du CD/DVD</label>
+                <label for="numero_cd_dvd">Numéro du CD/DVD</label>
                 <input type="number" id="numero_cd_dvd" name="numero_cd_dvd" min="1">
             </div>
             <div class="champ-formulaire grand">
@@ -30,4 +30,5 @@
         </div>
     </form>
 </div>
-[% endblock %]
+{% endblock %}
+

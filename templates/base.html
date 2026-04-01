@@ -1,23 +1,23 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>[% block title %]BibliothÃ¨que de Valence[% endblock %]</title>
-    <link rel="stylesheet" href="[[ url_for('static', filename='style.css') ]]">
-    <link rel="icon" href="[[ url_for('static', filename='icone.png') ]]">
+    <title>{% block title %}Bibliothèque de Valence{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
 </head>
 <body>
 <header class="entete">
     <div class="bloc-logo">
         <div class="logo">B</div>
         <div>
-            <div class="nom-biblio">BibliothÃ¨que de Valence</div>
+            <div class="nom-biblio">Bibliothèque de Valence</div>
             <div class="sous-titre">Centre-ville</div>
         </div>
     </div>
 
     <nav class="menu">
-        <a class="lien-menu" href="[[ url_for('accueil') ]]">Accueil</a>
+        <a class="lien-menu" href="{{ url_for('accueil') }}">Accueil</a>
 
         <div class="menu-deroulant">
             <button class="bouton-menu" type="button">Catalogue</button>
@@ -25,42 +25,43 @@
                 <div class="sous-menu">
                     <button class="titre-sous-menu" type="button">Livres</button>
                     <div class="contenu-sous-menu">
-                        [% for cat in menu_categories %]
-                            <a href="[[ url_for('catalogue', slug=cat.slug) ]]">[[ cat.nom ]]</a>
-                        [% endfor %]
+                        {% for cat in menu_categories %}
+                            <a href="{{ url_for('catalogue', slug=cat.slug) }}">{{ cat.nom }}</a>
+                        {% endfor %}
                     </div>
                 </div>
-                <a href="[[ url_for('cddvd') ]]">CD / DVD</a>
+                <a href="{{ url_for('cddvd') }}">CD / DVD</a>
             </div>
         </div>
 
-        <a class="lien-menu" href="[[ url_for('reserver') ]]">RÃ©server</a>
-        <a class="lien-menu" href="[[ url_for('rendre') ]]">Rendre</a>
-        <a class="lien-menu" href="[[ url_for('autres') ]]">Autres</a>
+        <a class="lien-menu" href="{{ url_for('reserver') }}">Réserver</a>
+        <a class="lien-menu" href="{{ url_for('rendre') }}">Rendre</a>
+        <a class="lien-menu" href="{{ url_for('autres') }}">Autres</a>
 
-        [% if admin_connecte %]
-            <a class="lien-menu" href="[[ url_for('admin') ]]">Administration</a>
+        {% if admin_connecte %}
+            <a class="lien-menu" href="{{ url_for('admin') }}">Administration</a>
             <span class="lien-menu">Bienvenue Administrateur</span>
-            <a class="lien-menu bouton-connexion" href="[[ url_for('deconnexion') ]]">DÃ©connexion</a>
-        [% elif utilisateur %]
-            <a class="lien-menu" href="[[ url_for('mes_reservations') ]]">Mon compte</a>
-            <span class="lien-menu">Bonjour [[ utilisateur.prenom ]]</span>
-            <a class="lien-menu bouton-connexion" href="[[ url_for('deconnexion') ]]">DÃ©connexion</a>
-        [% else %]
-            <a class="lien-menu bouton-connexion" href="[[ url_for('connexion') ]]">Connexion</a>
-        [% endif %]
+            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
+        {% elif utilisateur %}
+            <a class="lien-menu" href="{{ url_for('mes_reservations') }}">Mon compte</a>
+            <span class="lien-menu">Bonjour {{ utilisateur.prenom }}</span>
+            <a class="lien-menu bouton-connexion" href="{{ url_for('deconnexion') }}">Déconnexion</a>
+        {% else %}
+            <a class="lien-menu bouton-connexion" href="{{ url_for('connexion') }}">Connexion</a>
+        {% endif %}
 
     </nav>
 </header>
 
 <main class="conteneur">
     <section class="bloc-principal">
-        [% block content %][% endblock %]
+        {% block content %}{% endblock %}
     </section>
 </main>
 
 <footer class="pied-page">
-    <p>2026 BibliothÃ¨que de Valence</p>
+    <p>2026 Bibliothèque de Valence</p>
 </footer>
 </body>
 </html>
+

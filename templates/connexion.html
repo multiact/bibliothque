@@ -1,23 +1,23 @@
-ï»¿[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Connexion - BibliothÃ¨que[% endblock %]
+{% block title %}Connexion - Bibliothèque{% endblock %}
 
-[% block content %]
+{% block content %}
 <h1>Mon compte</h1>
-<p>Connecte-toi ou crÃ©e un compte.</p>
+<p>Connecte-toi ou crée un compte.</p>
 
-[% if erreur %]
-<div class="message-erreur">[[ erreur ]]</div>
-[% endif %]
+{% if erreur %}
+<div class="message-erreur">{{ erreur }}</div>
+{% endif %}
 
 <div class="bloc-connexion">
     <div class="formulaire">
-        <h2>CrÃ©er un compte</h2>
-        <form method="POST" action="[[ url_for('creer_compte') ]]">
-            <input type="hidden" name="next" value="[[ prochain ]]">
+        <h2>Créer un compte</h2>
+        <form method="POST" action="{{ url_for('creer_compte') }}">
+            <input type="hidden" name="next" value="{{ prochain }}">
             <div class="grille-formulaire">
                 <div class="champ-formulaire">
-                    <label for="prenom">PrÃ©nom</label>
+                    <label for="prenom">Prénom</label>
                     <input type="text" id="prenom" name="prenom" required>
                 </div>
                 <div class="champ-formulaire">
@@ -41,7 +41,7 @@
                     <input type="password" id="motdepasse_creation" name="password" required>
                 </div>
                 <div class="champ-formulaire grand">
-                    <button type="submit">CrÃ©er le compte</button>
+                    <button type="submit">Créer le compte</button>
                 </div>
             </div>
         </form>
@@ -51,8 +51,8 @@
 
     <div class="formulaire">
         <h2>Connexion</h2>
-        <form method="POST" action="[[ url_for('connexion') ]]" class="formulaire-simple">
-            <input type="hidden" name="next" value="[[ prochain ]]">
+        <form method="POST" action="{{ url_for('connexion') }}" class="formulaire-simple">
+            <input type="hidden" name="next" value="{{ prochain }}">
             <div class="champ-formulaire">
                 <label for="email_connexion">Adresse mail</label>
                 <input type="text" id="email_connexion" name="email" required>
@@ -67,4 +67,5 @@
         </form>
     </div>
 </div>
-[% endblock %]
+{% endblock %}
+

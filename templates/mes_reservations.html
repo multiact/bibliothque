@@ -1,8 +1,8 @@
-[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Mes réservations[% endblock %]
+{% block title %}Mes réservations{% endblock %}
 
-[% block content %]
+{% block content %}
 <h1>Mes réservations</h1>
 
 <div class="table-conteneur">
@@ -21,30 +21,31 @@
             </tr>
         </thead>
         <tbody>
-            [% for r in reservations %]
+            {% for r in reservations %}
             <tr>
-                <td>[[ r['id_reservation'] ]]</td>
-                <td>[[ r['type_media'] ]]</td>
-                <td>[[ r['nom_media'] ]]</td>
-                <td>[[ r['auteur_media'] or '-' ]]</td>
-                <td>[[ r['reference_media'] ]]</td>
-                <td>[[ r['date_reservation'] ]]</td>
-                <td>[[ r['date_limite_retour'] or '-' ]]</td>
-                <td>[[ r['bibliotheque_retrait'] ]]</td>
+                <td>{{ r['id_reservation'] }}</td>
+                <td>{{ r['type_media'] }}</td>
+                <td>{{ r['nom_media'] }}</td>
+                <td>{{ r['auteur_media'] or '-' }}</td>
+                <td>{{ r['reference_media'] }}</td>
+                <td>{{ r['date_reservation'] }}</td>
+                <td>{{ r['date_limite_retour'] or '-' }}</td>
+                <td>{{ r['bibliotheque_retrait'] }}</td>
                 <td>
-                    [% if r['date_retour_effective'] %]
-                        Rendue le [[ r['date_retour_effective'] ]]
-                    [% else %]
+                    {% if r['date_retour_effective'] %}
+                        Rendue le {{ r['date_retour_effective'] }}
+                    {% else %}
                         En cours
-                    [% endif %]
+                    {% endif %}
                 </td>
             </tr>
-            [% else %]
+            {% else %}
             <tr>
                 <td colspan="9">Aucune réservation pour le moment.</td>
             </tr>
-            [% endfor %]
+            {% endfor %}
         </tbody>
     </table>
 </div>
-[% endblock %]
+{% endblock %}
+

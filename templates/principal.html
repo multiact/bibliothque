@@ -1,48 +1,49 @@
-﻿[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Accueil - Bibliothèque[% endblock %]
+{% block title %}Accueil - Biblioth�que{% endblock %}
 
-[% block content %]
-<h1>Bienvenue à la bibliothèque de Valence</h1>
-<p>Bibliothèque municipale du centre-ville.</p>
+{% block content %}
+<h1>Bienvenue {{nomutlisateur}} à la biblioth�que de Valence</h1>
+<p>Biblioth�que municipale du centre-ville.</p>
 
 <div class="liste-blocs">
-    <a class="bloc" href="[[ url_for('catalogue', slug='roman-classique') ]]">
+    <a class="bloc" href="{{ url_for('catalogue', slug='roman-classique') }}">
         <h3>Romans</h3>
         <p>Consulter les romans disponibles.</p>
     </a>
 
-    <a class="bloc" href="[[ url_for('reserver') ]]">
-        <h3>Réserver un livre</h3>
-        <p>Faire une réservation en ligne.</p>
+    <a class="bloc" href="{{ url_for('reserver') }}">
+        <h3>R�server un livre</h3>
+        <p>Faire une r�servation en ligne.</p>
     </a>
 
-    [% if utilisateur %]
-    <a class="bloc" href="[[ url_for('mes_reservations') ]]">
+    {% if utilisateur %}
+    <a class="bloc" href="{{ url_for('mes_reservations') }}">
         <h3>Mon compte</h3>
-        <p>Voir mes réservations en cours.</p>
+        <p>Voir mes r�servations en cours.</p>
     </a>
-    [% else %]
-    <a class="bloc" href="[[ url_for('connexion') ]]">
+    {% else %}
+    <a class="bloc" href="{{ url_for('connexion') }}">
         <h3>Mon compte</h3>
-        <p>Se connecter ou créer un compte.</p>
+        <p>Se connecter ou cr�er un compte.</p>
     </a>
-    [% endif %]
+    {% endif %}
 </div>
 
 <h2>Horaires</h2>
 <table class="tableau-horaires">
     <thead>
-        <tr><th>Jour</th><th>Matin</th><th>Après-midi</th></tr>
+        <tr><th>Jour</th><th>Matin</th><th>Apr�s-midi</th></tr>
     </thead>
     <tbody>
-        <tr><td>Lundi</td><td>Fermé</td><td>Fermé</td></tr>
+        <tr><td>Lundi</td><td>Ferm�</td><td>Ferm�</td></tr>
         <tr><td>Mardi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Mercredi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Jeudi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Vendredi</td><td>8h30 - 12h</td><td>14h - 20h</td></tr>
         <tr><td>Samedi</td><td>10h - 13h</td><td>14h - 17h</td></tr>
-        <tr><td>Dimanche</td><td>10h - 12h</td><td>Fermé</td></tr>
+        <tr><td>Dimanche</td><td>10h - 12h</td><td>Ferm�</td></tr>
     </tbody>
 </table>
-[% endblock %]
+{% endblock %}
+

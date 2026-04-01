@@ -1,38 +1,39 @@
-ï»¿[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Catalogue - [[ categorie.nom ]][% endblock %]
+{% block title %}Catalogue - {{ categorie.nom }}{% endblock %}
 
-[% block content %]
-<h1>Catalogue : [[ categorie.nom ]]</h1>
+{% block content %}
+<h1>Catalogue : {{ categorie.nom }}</h1>
 
 <form method="GET" class="barre-recherche">
-    <input type="text" name="q" value="[[ recherche ]]" placeholder="Rechercher un livre, auteur ou ISBN">
+    <input type="text" name="q" value="{{ recherche }}" placeholder="Rechercher un livre, auteur ou ISBN">
     <button type="submit">Rechercher</button>
 </form>
 
 <div class="liste-livres">
-    [% for livre in livres %]
+    {% for livre in livres %}
     <div class="bloc-livre">
-        [% if livre['image'] %]
-            <img src="[[ url_for('static', filename=(livre['image'] if '/' in livre['image'] else 'couvertures/' ~ livre['image'])) ]]" alt="Couverture [[ livre['nom_livre'] ]]" class="image-livre">
-        [% else %]
+        {% if livre['image'] %}
+            <img src="{{ url_for('static', filename=(livre['image'] if '/' in livre['image'] else 'couvertures/' ~ livre['image'])) }}" alt="Couverture {{ livre['nom_livre'] }}" class="image-livre">
+        {% else %}
             <div class="image-livre image-vide">Pas de couverture</div>
-        [% endif %]
+        {% endif %}
 
-        <h3>[[ livre["nom_livre"] ]]</h3>
-        <p><strong>Auteur :</strong> [[ livre["auteur_livre"] ]]</p>
-        <p><strong>ISBN :</strong> [[ livre["ISBN_livre"] ]]</p>
-        <p><strong>Exemplaires restants :</strong> [[ livre["exemplaires_restants"] ]] / [[ livre["total_exemplaires"] ]]</p>
-        <p>[[ livre["resume"] or "RÃ©sumÃ© non renseignÃ©." ]]</p>
+        <h3>{{ livre["nom_livre"] }}</h3>
+        <p><strong>Auteur :</strong> {{ livre["auteur_livre"] }}</p>
+        <p><strong>ISBN :</strong> {{ livre["ISBN_livre"] }}</p>
+        <p><strong>Exemplaires restants :</strong> {{ livre["exemplaires_restants"] }} / {{ livre["total_exemplaires"] }}</p>
+        <p>{{ livre["resume"] or "Résumé non renseigné." }}</p>
 
-        [% if livre["disponible"] == 1 %]
+        {% if livre["disponible"] == 1 %}
             <p class="disponible">Disponible</p>
-        [% else %]
+        {% else %}
             <p class="indisponible">Indisponible</p>
-        [% endif %]
+        {% endif %}
     </div>
-    [% else %]
-    <p>Aucun livre trouvÃ© pour cette recherche.</p>
-    [% endfor %]
+    {% else %}
+    <p>Aucun livre trouvé pour cette recherche.</p>
+    {% endfor %}
 </div>
-[% endblock %]
+{% endblock %}
+

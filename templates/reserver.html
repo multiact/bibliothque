@@ -1,21 +1,21 @@
-[% extends "base.html" %]
+{% extends "base.html" %}
 
-[% block title %]Réserver[% endblock %]
+{% block title %}Réserver{% endblock %}
 
-[% block content %]
+{% block content %}
 <h1>Réserver</h1>
 <p>Livre : entre l'ISBN. CD/DVD : entre le numéro. Retrait unique : Centre-ville.</p>
 <p>Règles : réservation possible jusqu'à 1 mois maximum, durée de prêt limitée à 3 semaines.</p>
 
-[% if erreur %]
-<div class="message-erreur">[[ erreur ]]</div>
-[% endif %]
-[% if message %]
-<div class="message-valide">[[ message ]]</div>
-[% endif %]
+{% if erreur %}
+<div class="message-erreur">{{ erreur }}</div>
+{% endif %}
+{% if message %}
+<div class="message-valide">{{ message }}</div>
+{% endif %}
 
 <div class="formulaire">
-    <form method="POST" action="[[ url_for('reserver') ]]">
+    <form method="POST" action="{{ url_for('reserver') }}">
         <div class="grille-formulaire">
             <div class="champ-formulaire grand">
                 <label for="isbn">ISBN du livre</label>
@@ -55,28 +55,29 @@
             </tr>
         </thead>
         <tbody>
-            [% for r in historique %]
+            {% for r in historique %}
             <tr>
-                <td>[[ r["id_reservation"] ]]</td>
-                <td>[[ r["type_media"] ]]</td>
-                <td>[[ r["nom_media"] ]]</td>
-                <td>[[ r["reference_media"] ]]</td>
-                <td>[[ r["date_reservation"] ]]</td>
-                <td>[[ r["date_limite_retour"] or "-" ]]</td>
+                <td>{{ r["id_reservation"] }}</td>
+                <td>{{ r["type_media"] }}</td>
+                <td>{{ r["nom_media"] }}</td>
+                <td>{{ r["reference_media"] }}</td>
+                <td>{{ r["date_reservation"] }}</td>
+                <td>{{ r["date_limite_retour"] or "-" }}</td>
                 <td>
-                    [% if r["date_retour_effective"] %]
-                        Rendue le [[ r["date_retour_effective"] ]]
-                    [% else %]
+                    {% if r["date_retour_effective"] %}
+                        Rendue le {{ r["date_retour_effective"] }}
+                    {% else %}
                         En cours
-                    [% endif %]
+                    {% endif %}
                 </td>
             </tr>
-            [% else %]
+            {% else %}
             <tr>
                 <td colspan="7">Aucune réservation pour le moment.</td>
             </tr>
-            [% endfor %]
+            {% endfor %}
         </tbody>
     </table>
 </div>
-[% endblock %]
+{% endblock %}
+
