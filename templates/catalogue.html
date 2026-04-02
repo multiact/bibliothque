@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+ï»¿{% extends "base.html" %}
 
 {% block title %}Catalogue - {{ categorie.nom }}{% endblock %}
 
@@ -23,7 +23,7 @@
         <p><strong>Auteur :</strong> {{ livre["auteur_livre"] }}</p>
         <p><strong>ISBN :</strong> {{ livre["ISBN_livre"] }}</p>
         <p><strong>Exemplaires restants :</strong> {{ livre["exemplaires_restants"] }} / {{ livre["total_exemplaires"] }}</p>
-        <p>{{ livre["resume"] or "Résumé non renseigné." }}</p>
+        <p>{{ livre["resume"] or "RÃ©sumÃ© non renseignÃ©." }}</p>
 
         {% if livre["disponible"] == 1 %}
             <p class="disponible">Disponible</p>
@@ -32,8 +32,9 @@
         {% endif %}
     </div>
     {% else %}
-    <p>Aucun livre trouvé pour cette recherche.</p>
+    <p>Aucun livre trouvÃ© pour cette recherche.</p>
     {% endfor %}
 </div>
 {% endblock %}
+
 

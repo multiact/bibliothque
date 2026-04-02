@@ -1,204 +1,52 @@
-{% extends "base.html" %}
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin-page">
+    <h1>Administration</h1>
+    <p>Page autonome: ajout et suppression de livre par ISBN.</p>
 
-{% block title %}Administration{% endblock %}
+    {% if erreur %}
+    <div class="error">{{ erreur }}</div>
+    {% endif %}
+    {% if message %}
+    <div class="ok">{{ message }}</div>
+    {% endif %}
 
-{% block content %}
-<h1>Administration</h1>
-<p>Ajouter ou supprimer des livres et des CD/DVD.</p>
-
-{% if erreur %}
-<div class="message-erreur">{{ erreur }}</div>
-{% endif %}
-{% if message %}
-<div class="message-valide">{{ message }}</div>
-{% endif %}
-
-<div class="grille-admin">
-    <div class="formulaire">
+    <div class="card">
         <h2>Ajouter un livre</h2>
-        <form method="POST" action="{{ url_for('admin') }}" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="ajouter">
-            <div class="grille-formulaire">
-                <div class="champ-formulaire grand">
-                    <label>Nom du livre</label>
-                    <input type="text" name="nom_livre" required>
-                </div>
-                <div class="champ-formulaire">
-                    <label>Auteur</label>
-                    <input type="text" name="auteur_livre" required>
-                </div>
-                <div class="champ-formulaire">
-                    <label>Maison d'édition</label>
-                    <input type="text" name="maison_edition_livre">
-                </div>
-                <div class="champ-formulaire">
-                    <label>Année</label>
-                    <input type="number" name="annee_livre">
-                </div>
-                <div class="champ-formulaire">
-                    <label>Catégorie</label>
-                    <select name="id_categorie" required>
-                        {% for cat in categories %}
-                        <option value="{{ cat['id_categorie'] }}">{{ cat['nom_categorie'] }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>ISBN</label>
-                    <input type="text" name="isbn_livre" required>
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Résumé</label>
-                    <input type="text" name="resume">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Nom d'image recommandé</label>
-                    <input type="text" id="nom_image_livre" name="nom_image_livre" placeholder="roman_24.jpg">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Fichier image livre</label>
-                    <input type="file" name="image_fichier_livre" accept="image/*">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Image static (chemin manuel, optionnel)</label>
-                    <input type="text" name="image">
-                </div>
-                <div class="champ-formulaire grand">
-                    <button type="submit">Ajouter</button>
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <div class="formulaire">
-        <h2>Ajouter un CD/DVD</h2>
-        <form method="POST" action="{{ url_for('admin') }}" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="ajouter_cddvd">
-            <div class="grille-formulaire">
-                <div class="champ-formulaire grand">
-                    <label>Nom du CD/DVD</label>
-                    <input type="text" name="nom_cd_dvd" required>
-                </div>
-                <div class="champ-formulaire">
-                    <label>Artiste</label>
-                    <input type="text" name="artiste_cd_dvd">
-                </div>
-                <div class="champ-formulaire">
-                    <label>Année</label>
-                    <input type="number" name="annee_cd_dvd">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Numéro CD/DVD (optionnel)</label>
-                    <input type="number" name="id_cd_dvd" placeholder="Laisse vide pour auto">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Nom d'image recommandé</label>
-                    <input type="text" id="nom_image_cddvd" name="nom_image_cddvd" placeholder="cddvd_01.jpg">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Fichier image CD/DVD</label>
-                    <input type="file" name="image_fichier_cddvd" accept="image/*">
-                </div>
-                <div class="champ-formulaire grand">
-                    <label>Image static (chemin manuel, optionnel)</label>
-                    <input type="text" name="image_cddvd">
-                </div>
-                <div class="champ-formulaire grand">
-                    <button type="submit">Ajouter</button>
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <div class="formulaire">
-        <h2>Gérer un livre / CD/DVD existant</h2>
         <form method="POST" action="{{ url_for('admin') }}">
-            <input type="hidden" name="action" value="gerer_existant">
-            <div class="champ-formulaire">
-                <label>ISBN livre</label>
-                <input type="text" name="isbn_livre_existant" placeholder="Ex: 9781234567890">
-            </div>
-            <div class="champ-formulaire">
-                <label>Numéro CD/DVD</label>
-                <input type="number" name="numero_cd_dvd_existant" placeholder="Ex: 15">
-            </div>
-            <div class="champ-formulaire">
-                <button type="submit" name="operation" value="+">+ Ajouter</button>
-                <button type="submit" name="operation" value="-">- Supprimer</button>
-            </div>
+            <input type="hidden" name="action" value="ajouter">
+            <label>Nom du livre</label>
+            <input type="text" name="nom_livre" required>
+            <label>ISBN</label>
+            <input type="text" name="isbn_livre" required>
+            <button type="submit">Ajouter</button>
         </form>
-        <p>Remplis un seul champ. + restaure un élément supprimé, - supprime l'élément existant.</p>
     </div>
-</div>
 
-<div class="formulaire zone-historique">
-    <h2>Historique des suppressions</h2>
-    <form method="GET" action="{{ url_for('admin') }}" class="barre-recherche">
-        <input type="text" name="q_supp" value="{{ recherche_suppression or '' }}" placeholder="Rechercher un livre/CD/DVD supprimé">
-        <button type="submit">Rechercher</button>
-    </form>
+    <div class="card">
+        <h2>Supprimer un livre</h2>
+        <form method="POST" action="{{ url_for('admin') }}">
+            <input type="hidden" name="action" value="supprimer">
+            <label>ISBN</label>
+            <input type="text" name="isbn_livre" required>
+            <button type="submit">Supprimer</button>
+        </form>
+    </div>
 
-    <div class="liste-admin">
-        {% for item in suppressions %}
-        <div class="ligne-historique">
-            <div>
-                <strong>{{ item['type_media']|upper }}</strong> -
-                {{ item['titre_media'] or 'Sans titre' }}
-                {% if item['auteur_media'] %}
-                ({{ item['auteur_media'] }})
-                {% endif %}
-                {% if item['annee_media'] %}
-                - {{ item['annee_media'] }}
-                {% endif %}
-                <br>
-                Réf. : {{ item['reference_media'] }} | Supprimé le {{ item['date_suppression'] }}
-                {% if item['restaure'] == 1 %}
-                | Restauré le {{ item['date_restauration'] or '-' }}
-                {% endif %}
-            </div>
-            {% if item['restaure'] == 0 %}
-                <form method="POST" action="{{ url_for('admin', q_supp=recherche_suppression, voir='1' if voir_plus else None) }}">
-                    <input type="hidden" name="action" value="restaurer">
-                    <input type="hidden" name="id_suppression" value="{{ item['id_suppression'] }}">
-                    <button type="submit">Rajouter</button>
-                </form>
-            {% else %}
-                <span class="indisponible">Restauré</span>
-            {% endif %}
-        </div>
+    <div class="card">
+        <h2>Derniers livres</h2>
+        {% for livre in livres %}
+        <div class="row"><strong>{{ livre['nom_livre'] }}</strong> - ISBN {{ livre['ISBN_livre'] }}</div>
         {% else %}
-        <p>Aucun élément supprimé trouvé.</p>
+        <div class="row">Aucun livre pour le moment.</div>
         {% endfor %}
     </div>
-
-    {% if not voir_plus and total_suppressions > suppressions|length %}
-    <div class="actions-historique">
-        <a class="bouton-voir-plus" href="{{ url_for('admin', q_supp=recherche_suppression, voir='1') }}">Voir plus</a>
-    </div>
-    {% endif %}
-</div>
-<script>
-const suggestionsLivres = {{ suggestions_images_livres|tojson }};
-const selectCategorie = document.querySelector('select[name="id_categorie"]');
-const nomImageLivre = document.getElementById("nom_image_livre");
-const nomImageCddvd = document.getElementById("nom_image_cddvd");
-
-function majNomLivre() {
-    if (!selectCategorie || !nomImageLivre) return;
-    const idCat = selectCategorie.value;
-    if (suggestionsLivres[idCat]) {
-        nomImageLivre.value = suggestionsLivres[idCat];
-    }
-}
-
-if (selectCategorie) {
-    selectCategorie.addEventListener("change", majNomLivre);
-    majNomLivre();
-}
-
-if (nomImageCddvd) {
-    nomImageCddvd.value = "{{ suggestion_image_cddvd }}";
-}
-</script>
-{% endblock %}
+</body>
+</html>
 

@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}Accueil - Biblioth�que{% endblock %}
+{% block title %}Accueil - BibliothÃ©que{% endblock %}
 
 {% block content %}
-<h1>Bienvenue {{nomutlisateur}} à la biblioth�que de Valence</h1>
-<p>Biblioth�que municipale du centre-ville.</p>
+<h1>Bienvenue {{nomutlisateur}} Ã  la bibliothï¿½que de Valence</h1>
+<p>Bibliothï¿½que municipale du centre-ville.</p>
 
 <div class="liste-blocs">
     <a class="bloc" href="{{ url_for('catalogue', slug='roman-classique') }}">
@@ -13,19 +13,19 @@
     </a>
 
     <a class="bloc" href="{{ url_for('reserver') }}">
-        <h3>R�server un livre</h3>
-        <p>Faire une r�servation en ligne.</p>
+        <h3>Rï¿½server un livre</h3>
+        <p>Faire une rï¿½servation en ligne.</p>
     </a>
 
     {% if utilisateur %}
     <a class="bloc" href="{{ url_for('mes_reservations') }}">
         <h3>Mon compte</h3>
-        <p>Voir mes r�servations en cours.</p>
+        <p>Voir mes rï¿½servations en cours.</p>
     </a>
     {% else %}
     <a class="bloc" href="{{ url_for('connexion') }}">
         <h3>Mon compte</h3>
-        <p>Se connecter ou cr�er un compte.</p>
+        <p>Se connecter ou crï¿½er un compte.</p>
     </a>
     {% endif %}
 </div>
@@ -33,17 +33,18 @@
 <h2>Horaires</h2>
 <table class="tableau-horaires">
     <thead>
-        <tr><th>Jour</th><th>Matin</th><th>Apr�s-midi</th></tr>
+        <tr><th>Jour</th><th>Matin</th><th>Aprï¿½s-midi</th></tr>
     </thead>
     <tbody>
-        <tr><td>Lundi</td><td>Ferm�</td><td>Ferm�</td></tr>
+        <tr><td>Lundi</td><td>FermÃ©</td><td>FermÃ©</td></tr>
         <tr><td>Mardi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Mercredi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Jeudi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Vendredi</td><td>8h30 - 12h</td><td>14h - 20h</td></tr>
         <tr><td>Samedi</td><td>10h - 13h</td><td>14h - 17h</td></tr>
-        <tr><td>Dimanche</td><td>10h - 12h</td><td>Ferm�</td></tr>
+        <tr><td>Dimanche</td><td>10h - 12h</td><td>Fermï¿½</td></tr>
     </tbody>
 </table>
 {% endblock %}
+
 

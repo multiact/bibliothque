@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+ï»¿{% extends "base.html" %}
 
-{% block title %}Connexion - Bibliothèque{% endblock %}
+{% block title %}Connexion - BibliothÃ¨que{% endblock %}
 
 {% block content %}
 <h1>Mon compte</h1>
-<p>Connecte-toi ou crée un compte.</p>
+<p>Connecte-toi ou crÃ©e un compte.</p>
 
 {% if erreur %}
 <div class="message-erreur">{{ erreur }}</div>
@@ -12,12 +12,12 @@
 
 <div class="bloc-connexion">
     <div class="formulaire">
-        <h2>Créer un compte</h2>
+        <h2>CrÃ©er un compte</h2>
         <form method="POST" action="{{ url_for('creer_compte') }}">
             <input type="hidden" name="next" value="{{ prochain }}">
             <div class="grille-formulaire">
                 <div class="champ-formulaire">
-                    <label for="prenom">Prénom</label>
+                    <label for="prenom">PrÃ©nom</label>
                     <input type="text" id="prenom" name="prenom" required>
                 </div>
                 <div class="champ-formulaire">
@@ -41,7 +41,7 @@
                     <input type="password" id="motdepasse_creation" name="password" required>
                 </div>
                 <div class="champ-formulaire grand">
-                    <button type="submit">Créer le compte</button>
+                    <button type="submit">CrÃ©er le compte</button>
                 </div>
             </div>
         </form>
@@ -68,4 +68,5 @@
     </div>
 </div>
 {% endblock %}
+
 

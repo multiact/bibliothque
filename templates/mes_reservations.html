@@ -1,9 +1,9 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}Mes réservations{% endblock %}
+{% block title %}Mes rÃ©servations{% endblock %}
 
 {% block content %}
-<h1>Mes réservations</h1>
+<h1>Mes rÃ©servations</h1>
 
 <div class="table-conteneur">
     <table class="tableau-horaires">
@@ -13,8 +13,8 @@
                 <th>Type</th>
                 <th>Titre</th>
                 <th>Auteur/Artiste</th>
-                <th>Référence</th>
-                <th>Date réservation</th>
+                <th>RÃ©fÃ©rence</th>
+                <th>Date rÃ©servation</th>
                 <th>Date limite de retour</th>
                 <th>Retrait</th>
                 <th>Statut</th>
@@ -41,11 +41,12 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="9">Aucune réservation pour le moment.</td>
+                <td colspan="9">Aucune rÃ©servation pour le moment.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 {% endblock %}
+
 

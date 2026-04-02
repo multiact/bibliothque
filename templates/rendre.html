@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+ï»¿{% extends "base.html" %}
 
 {% block title %}Rendre{% endblock %}
 
 {% block content %}
 <h1>Rendre</h1>
-<p>Entre l'ISBN du livre ou le numéro du CD/DVD réservé.</p>
+<p>Entre l'ISBN du livre ou le numÃ©ro du CD/DVD rÃ©servÃ©.</p>
 
 {% if erreur %}
 <div class="message-erreur">{{ erreur }}</div>
@@ -21,7 +21,7 @@
                 <input type="text" id="isbn" name="isbn">
             </div>
             <div class="champ-formulaire grand">
-                <label for="numero_cd_dvd">Numéro du CD/DVD</label>
+                <label for="numero_cd_dvd">NumÃ©ro du CD/DVD</label>
                 <input type="number" id="numero_cd_dvd" name="numero_cd_dvd" min="1">
             </div>
             <div class="champ-formulaire grand">
@@ -31,4 +31,5 @@
     </form>
 </div>
 {% endblock %}
+
 
