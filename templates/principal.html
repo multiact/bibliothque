@@ -1,10 +1,10 @@
 ﻿{% extends "base.html" %}
 
-{% block title %}Accueil - BibliothÃ©que{% endblock %}
+{% block title %}Accueil - Bibliothéque{% endblock %}
 
 {% block content %}
-<h1>Bienvenue {{nomutlisateur}} Ã  la bibliothï¿½que de Valence</h1>
-<p>Bibliothï¿½que municipale du centre-ville.</p>
+<h1>Bienvenue {{nomutlisateur}} à la bibliothèque de Valence</h1>
+<p>Bibliothèque municipale du centre-ville.</p>
 
 <div class="liste-blocs">
     <a class="bloc" href="{{ url_for('catalogue', categorie_url='roman-classique') }}">
@@ -14,18 +14,18 @@
 
     <a class="bloc" href="{{ url_for('reserver') }}">
         <h3>Réserver un livre</h3>
-        <p>Faire une rï¿½servation en ligne.</p>
+        <p>Faire une réservation en ligne.</p>
     </a>
 
     {% if utilisateur %}
     <a class="bloc" href="{{ url_for('mes_reservations') }}">
         <h3>Mon compte</h3>
-        <p>Voir mes rï¿½servations en cours.</p>
+        <p>Voir mes réservations en cours.</p>
     </a>
     {% else %}
     <a class="bloc" href="{{ url_for('connexion') }}">
         <h3>Mon compte</h3>
-        <p>Se connecter ou crï¿½er un compte.</p>
+        <p>Se connecter ou créer un compte.</p>
     </a>
     {% endif %}
 </div>
@@ -33,7 +33,7 @@
 <h2>Horaires</h2>
 <table class="tableau-horaires">
     <thead>
-        <tr><th>Jour</th><th>Matin</th><th>Aprï¿½s-midi</th></tr>
+        <tr><th>Jour</th><th>Matin</th><th>Aprés-midi</th></tr>
     </thead>
     <tbody>
         <tr><td>Lundi</td><td>FermÃ©</td><td>FermÃ©</td></tr>

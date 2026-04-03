@@ -9,28 +9,28 @@
 <div class="liste-blocs cartes-stats">
     <div class="bloc">
         <h3>Clients</h3>
-        <p>{{ nb_clients_initial }}</p>
+        <p>{{ nb_clients }}</p>
     </div>
     <div class="bloc">
-        <h3>R�servations actives</h3>
+        <h3>Réservations actives</h3>
         <p>{{ nb_reservations_actives }}</p>
     </div>
 </div>
 
-<h2>�quipe</h2>
-<h2>La grande g�rante de la biblioth�que est <strong>Lisette Baccega</strong>.</h2>
+<h2>équipe</h2>
+<h2>La grande gérante de la bibliothèque est <strong>Lisette Baccega</strong>.</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
             <tr>
                 <th>Nom</th>
-                <th>R�le</th>
+                <th>Rôle</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>Yael Lunven</td>
-                <td>Responsable des r�servations</td>
+                <td>Responsable des réservations</td>
             </tr>
             <tr>
                 <td>Quentin Laverdure</td>
@@ -48,16 +48,17 @@
     </table>
 </div>
 
-{% if graph_image %}
+<h3>Nombre total de réservations par jour (30 jours)</h3>
+<p><strong>Total des réservations (30 jours) :</strong> {{ total_reservations_30j }}</p>
+{% if stats_chart_image %}
 <div class="zone-graphe">
-    <img src="data:image/png;base64,{{ graph_image }}" alt="Graphique connexions par heure" class="image-graphe">
+    <img src="data:image/png;base64,{{ stats_chart_image }}" alt="Graphique du nombre total de réservations par jour" class="image-graphe">
 </div>
-<p><strong>Total des connexions :</strong> {{ total_connexions }}</p>
 {% else %}
-<div class="message-erreur">{{ graph_info }}</div>
+<div class="message-erreur">{{ stats_chart_error }}</div>
 {% endif %}
 
-<h2>Top 10 livres les plus demand�s</h2>
+<h2>Top 10 livres les plus demandés</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
@@ -87,62 +88,6 @@
     </table>
 </div>
 
-<h2>Top 5 CD les plus demand�s</h2>
-<div class="table-conteneur">
-    <table class="tableau-horaires">
-        <thead>
-            <tr>
-                <th>Rang</th>
-                <th>CD</th>
-                <th>Demandes</th>
-                <th>Voir</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in top_cds_demandes %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item["nom_cd_dvd"] }}</td>
-                <td>{{ item["nb_demandes"] }}</td>
-                <td><a href="/cddvd?q={{ item['nom_cd_dvd']|urlencode }}">Voir ce CD</a></td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4">Aucune demande CD pour le moment.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<h2>Top 5 DVD les plus demand�s</h2>
-<div class="table-conteneur">
-    <table class="tableau-horaires">
-        <thead>
-            <tr>
-                <th>Rang</th>
-                <th>DVD</th>
-                <th>Demandes</th>
-                <th>Voir</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in top_dvds_demandes %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item["nom_cd_dvd"] }}</td>
-                <td>{{ item["nb_demandes"] }}</td>
-                <td><a href="/cddvd?q={{ item['nom_cd_dvd']|urlencode }}">Voir ce DVD</a></td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4">Aucune demande DVD pour le moment.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
 <h2>Contacts</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
@@ -150,7 +95,7 @@
             <tr>
                 <th>Service</th>
                 <th>Contact</th>
-                <th>Disponibilit�</th>
+                <th>Disponibilité</th>
             </tr>
         </thead>
         <tbody>
@@ -171,7 +116,7 @@
             </tr>
             <tr>
                 <td>Adresse</td>
-                <td>Biblioth�que Centre-ville, 1 avenue du Champ de Mars, 26000 Valence</td>
+                <td>Bibliothèque Centre-ville, 1 avenue du Champ de Mars, 26000 Valence</td>
                 <td>Ouvert au public</td>
             </tr>
         </tbody>

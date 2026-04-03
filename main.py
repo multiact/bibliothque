@@ -1,35 +1,29 @@
-﻿from datetime import date, timedelta
+﻿from datetime import date, datetime, timedelta
+from collections import Counter
 from io import BytesIO
 import base64
+import importlib
 import sqlite3
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
-
+from matplotlib.figure import Figure
+import database
 application = Flask(__name__)
 application.secret_key = "cle_secrete_bibliotheque"
-BASE_DONNEES = "bibliotheque.db"
+BASE_DONNEES = database.BASE_DONNEES
 
 
-# On charge le fichier def.py (module utilitaire)
-module_def = __import__("def")
+# Import du module utilitaire def.py
+module_def = importlib.import_module("def")
+module_def.BASE_DONNEES = BASE_DONNEES
 
-def bdd():
-    return module_def.bdd(BASE_DONNEES)
-
-def date_francaise(valeur_date):
-    return module_def.date_francaise(valeur_date)
-
-def prochain_identifiant(base, table, colonne):
-    return module_def.prochain_identifiant(base, table, colonne)
-
-def faire_slug(texte):
-    return module_def.faire_slug(texte)
-
-def categories_menu():
-    return module_def.categories_menu(BASE_DONNEES)
-
-def verifier_connexion():
-    return module_def.verifier_connexion()
+# Appels des fonctions de def.py 
+bdd = module_def.bdd
+date_francaise = module_def.date_francaise
+prochain_identifiant = module_def.prochain_identifiant
+faire_slug = module_def.faire_slug
+categories_menu = module_def.categories_menu
+verifier_connexion = module_def.verifier_connexion
 
 
 @application.teardown_appcontext
@@ -349,35 +343,83 @@ def creer_compte():
 def autres():
     base = bdd()
     nb_clients = int(base.execute("SELECT COUNT(*) FROM CLIENT").fetchone()[0])
-    nb_actives = int(
+    nb_reservations_actives = int(
         base.execute("SELECT COUNT(*) FROM RESERVATION WHERE date_retour_effective IS NULL").fetchone()[0]
     )
-    graph_image = ""
-    graph_info = ""
-    total_connexions = nb_clients + nb_actives
+    top_livres_demandes = [
+        dict(x)
+        for x in base.execute(
+            """
+            SELECT
+                l.id_livre,
+                l.nom_livre,
+                c.nom_categorie,
+                COUNT(*) AS nb_demandes
+            FROM "LIGNE LIVRE" ll
+            JOIN LIVRE l ON l.id_livre = ll.id_livre
+            LEFT JOIN CATEGORIE c ON c.id_categorie = l.id_categorie
+            GROUP BY l.id_livre, l.nom_livre, c.nom_categorie
+            ORDER BY nb_demandes DESC, l.nom_livre ASC
+            LIMIT 10
+            """
+        ).fetchall()
+    ]
+    for livre in top_livres_demandes:
+        livre["slug_categorie"] = faire_slug(livre.get("nom_categorie") or "")
+
+    total_reservations_30j = 0
+    aujourd_hui = date.today()
+    date_min = aujourd_hui - timedelta(days=29)
+    reservations = base.execute(
+        "SELECT date_reservation FROM RESERVATION WHERE date_reservation IS NOT NULL"
+    ).fetchall()
+
+    compte_par_jour = Counter()
+    for ligne in reservations:
+        date_brute = str(ligne["date_reservation"] or "").strip()
+        if not date_brute:
+            continue
+        try:
+            jour = datetime.strptime(date_brute, "%d/%m/%Y").date()
+        except ValueError:
+            continue
+        if date_min <= jour <= aujourd_hui:
+            compte_par_jour[jour] += 1
+
+    stats_30j = []
+    for i in range(30):
+        jour = date_min + timedelta(days=i)
+        nb = int(compte_par_jour.get(jour, 0))
+        total_reservations_30j += nb
+        stats_30j.append({"date": jour.strftime("%d/%m"), "nb_reservations": nb})
+
+    stats_chart_image = ""
+    stats_chart_error = ""
     try:
-        from matplotlib.figure import Figure
-        figure = Figure(figsize=(4.8, 2.4))
+        figure = Figure(figsize=(8.2, 3.1))
         axe = figure.add_subplot(111)
-        axe.bar(["Clients", "Réservations"], [nb_clients, nb_actives], color=["#2f7bde", "#18a67a"])
-        axe.set_title("Vue rapide")
+        labels = [x["date"] for x in stats_30j]
+        valeurs = [x["nb_reservations"] for x in stats_30j]
+        x = list(range(len(labels)))
+        axe.plot(x, valeurs, marker="o", linewidth=2, markersize=4, color="#1f77b4")
+        axe.set_title("Nombre total de réservations par jour (30 derniers jours)")
+        axe.set_ylabel("Nombre de réservations")
+        axe.set_xticks(x[::5], [labels[i] for i in x[::5]])
+        axe.grid(axis="y", alpha=0.3)
         tampon = BytesIO()
         figure.tight_layout()
         figure.savefig(tampon, format="png")
-        graph_image = base64.b64encode(tampon.getvalue()).decode("utf-8")
+        stats_chart_image = base64.b64encode(tampon.getvalue()).decode("utf-8")
     except Exception:
-        graph_info = "Graphique indisponible sur cet environnement."
+        stats_chart_error = "Graphique indisponible sur cet environnement."
     return render_template(
         "autres.html",
-        graph_image=graph_image,
-        graph_info=graph_info,
-        nb_clients_web=nb_clients,
-        nb_clients_initial=nb_clients,
-        nb_reservations_actives=nb_actives,
-        top_livres_demandes=[],
-        top_cds_demandes=[],
-        top_dvds_demandes=[],
-        total_connexions=total_connexions,
+        nb_clients=nb_clients,
+        nb_reservations_actives=nb_reservations_actives,
+        total_reservations_30j=total_reservations_30j,
+        stats_chart_image=stats_chart_image,
+        stats_chart_error=stats_chart_error,
+        top_livres_demandes=top_livres_demandes,
     )
 @application.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -432,6 +474,9 @@ def deconnexion():
     return redirect(url_for("accueil"))
 if __name__ == "__main__":
     application.run(debug=True)
+
+
+
 
 
 

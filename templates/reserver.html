@@ -1,11 +1,11 @@
 ﻿{% extends "base.html" %}
 
-{% block title %}RÃ©server{% endblock %}
+{% block title %}Réserver{% endblock %}
 
 {% block content %}
-<h1>RÃ©server</h1>
-<p>Livre : entre l'ISBN. CD/DVD : entre le numÃ©ro.</p>
-<p>RÃ¨gles : rÃ©servation possible jusqu'Ã  1 mois maximum, durÃ©e de prÃªt limitÃ©e Ã  3 semaines.</p>
+<h1>Réserver</h1>
+<p>Livre : entre l'ISBN. CD/DVD : entre le numéro.</p>
+<p>Règles : réservation possible jusqu'à un mois maximum, durée de prêt limitée à 3 semaines.</p>
 
 {% if erreur %}
 <div class="message-erreur">{{ erreur }}</div>
@@ -22,21 +22,21 @@
                 <input type="text" id="isbn" name="isbn">
             </div>
             <div class="champ-formulaire grand">
-                <label for="numero_cd_dvd">NumÃ©ro du CD/DVD</label>
+                <label for="numero_cd_dvd">Numéro du CD/DVD</label>
                 <input type="number" id="numero_cd_dvd" name="numero_cd_dvd" min="1">
             </div>
             <div class="champ-formulaire">
-                <label for="date_reservation">Date de rÃ©servation</label>
+                <label for="date_reservation">Date de réservation</label>
                 <input type="date" id="date_reservation" name="date_reservation">
             </div>
             <div class="champ-formulaire grand">
-                <button type="submit">Valider la rÃ©servation</button>
+                <button type="submit">Valider la réservation</button>
             </div>
         </div>
     </form>
 </div>
 
-<h2>Historique de mes rÃ©servations</h2>
+<h2>Historique de mes réservations</h2>
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
@@ -44,8 +44,8 @@
                 <th>ID</th>
                 <th>Type</th>
                 <th>Titre</th>
-                <th>RÃ©fÃ©rence</th>
-                <th>Date de rÃ©servation</th>
+                <th>Référence</th>
+                <th>Date de réservation</th>
                 <th>Date limite de retour</th>
                 <th>Statut</th>
             </tr>
@@ -69,7 +69,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="7">Aucune rÃ©servation pour le moment.</td>
+                <td colspan="7">Aucune réservation pour le moment.</td>
             </tr>
             {% endfor %}
         </tbody>
