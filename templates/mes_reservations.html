@@ -16,7 +16,6 @@
                 <th>RÃ©fÃ©rence</th>
                 <th>Date rÃ©servation</th>
                 <th>Date limite de retour</th>
-                <th>Retrait</th>
                 <th>Statut</th>
             </tr>
         </thead>
@@ -30,7 +29,6 @@
                 <td>{{ r['reference_media'] }}</td>
                 <td>{{ r['date_reservation'] }}</td>
                 <td>{{ r['date_limite_retour'] or '-' }}</td>
-                <td>{{ r['bibliotheque_retrait'] }}</td>
                 <td>
                     {% if r['date_retour_effective'] %}
                         Rendue le {{ r['date_retour_effective'] }}
@@ -41,7 +39,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="9">Aucune rÃ©servation pour le moment.</td>
+                <td colspan="8">Aucune rÃ©servation pour le moment.</td>
             </tr>
             {% endfor %}
         </tbody>

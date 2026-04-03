@@ -1,52 +1,55 @@
-﻿<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administration</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body class="admin-page">
-    <h1>Administration</h1>
-    <p>Page autonome: ajout et suppression de livre par ISBN.</p>
+{% extends "base.html" %}
 
-    {% if erreur %}
-    <div class="error">{{ erreur }}</div>
-    {% endif %}
-    {% if message %}
-    <div class="ok">{{ message }}</div>
-    {% endif %}
+{% block title %}Administration{% endblock %}
 
-    <div class="card">
-        <h2>Ajouter un livre</h2>
-        <form method="POST" action="{{ url_for('admin') }}">
-            <input type="hidden" name="action" value="ajouter">
-            <label>Nom du livre</label>
-            <input type="text" name="nom_livre" required>
-            <label>ISBN</label>
-            <input type="text" name="isbn_livre" required>
-            <button type="submit">Ajouter</button>
-        </form>
-    </div>
+{% block content %}
+<h1>Administration</h1>
+<p>Ajout et suppression de livre par ISBN.</p>
 
-    <div class="card">
-        <h2>Supprimer un livre</h2>
-        <form method="POST" action="{{ url_for('admin') }}">
-            <input type="hidden" name="action" value="supprimer">
-            <label>ISBN</label>
-            <input type="text" name="isbn_livre" required>
-            <button type="submit">Supprimer</button>
-        </form>
-    </div>
+{% if erreur %}
+<div class="error">{{ erreur }}</div>
+{% endif %}
+{% if message %}
+<div class="ok">{{ message }}</div>
+{% endif %}
 
-    <div class="card">
-        <h2>Derniers livres</h2>
-        {% for livre in livres %}
-        <div class="row"><strong>{{ livre['nom_livre'] }}</strong> - ISBN {{ livre['ISBN_livre'] }}</div>
-        {% else %}
-        <div class="row">Aucun livre pour le moment.</div>
-        {% endfor %}
-    </div>
-</body>
-</html>
+<div class="card">
+    <h2>Ajouter un livre</h2>
+    <form method="POST" action="{{ url_for('admin') }}">
+        <input type="hidden" name="action" value="ajouter">
+        <label>Nom du livre</label>
+        <input type="text" name="nom_livre" required>
 
+        <label>Catégorie</label>
+        <select name="id_categorie" required>
+            <option value="">Choisir une catégorie</option>
+            {% for categorie in categories %}
+            <option value="{{ categorie['id_categorie'] }}">{{ categorie['nom_categorie'] }}</option>
+            {% endfor %}
+        </select>
+
+        <label>ISBN</label>
+        <input type="text" name="isbn_livre" required>
+        <button type="submit">Ajouter</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Supprimer un livre</h2>
+    <form method="POST" action="{{ url_for('admin') }}">
+        <input type="hidden" name="action" value="supprimer">
+        <label>ISBN</label>
+        <input type="text" name="isbn_livre" required>
+        <button type="submit">Supprimer</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Derniers livres</h2>
+    {% for livre in livres %}
+    <div class="row"><strong>{{ livre['nom_livre'] }}</strong> - ISBN {{ livre['ISBN_livre'] }}</div>
+    {% else %}
+    <div class="row">Aucun livre pour le moment.</div>
+    {% endfor %}
+</div>
+{% endblock %}

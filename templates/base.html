@@ -26,7 +26,7 @@
                     <button class="titre-sous-menu" type="button">Livres</button>
                     <div class="contenu-sous-menu">
                         {% for cat in menu_categories %}
-                            <a href="{{ url_for('catalogue', slug=cat.slug) }}">{{ cat.nom }}</a>
+                            <a href="{{ url_for('catalogue', categorie_url=cat.categorie_url) }}">{{ cat.nom }}</a>
                         {% endfor %}
                     </div>
                 </div>

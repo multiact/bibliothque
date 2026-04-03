@@ -4,7 +4,7 @@
 
 {% block content %}
 <h1>RÃ©server</h1>
-<p>Livre : entre l'ISBN. CD/DVD : entre le numÃ©ro. Retrait unique : Centre-ville.</p>
+<p>Livre : entre l'ISBN. CD/DVD : entre le numÃ©ro.</p>
 <p>RÃ¨gles : rÃ©servation possible jusqu'Ã  1 mois maximum, durÃ©e de prÃªt limitÃ©e Ã  3 semaines.</p>
 
 {% if erreur %}
@@ -28,10 +28,6 @@
             <div class="champ-formulaire">
                 <label for="date_reservation">Date de rÃ©servation</label>
                 <input type="date" id="date_reservation" name="date_reservation">
-            </div>
-            <div class="champ-formulaire">
-                <label for="bibliotheque">BibliothÃ¨que de retrait</label>
-                <input type="text" id="bibliotheque" value="Centre-ville" disabled>
             </div>
             <div class="champ-formulaire grand">
                 <button type="submit">Valider la rÃ©servation</button>

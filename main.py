@@ -1,76 +1,68 @@
 ﻿from datetime import date, timedelta
+from io import BytesIO
+import base64
 import sqlite3
-from flask import Flask, g, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+
 application = Flask(__name__)
 application.secret_key = "cle_secrete_bibliotheque"
 BASE_DONNEES = "bibliotheque.db"
+
+
+# On charge le fichier def.py (module utilitaire)
+module_def = __import__("def")
+
 def bdd():
-    if "bdd" not in g:
-        g.bdd = sqlite3.connect(BASE_DONNEES)
-        g.bdd.row_factory = sqlite3.Row
-    return g.bdd
+    return module_def.bdd(BASE_DONNEES)
+
+def date_francaise(valeur_date):
+    return module_def.date_francaise(valeur_date)
+
+def prochain_identifiant(base, table, colonne):
+    return module_def.prochain_identifiant(base, table, colonne)
+
+def faire_slug(texte):
+    return module_def.faire_slug(texte)
+
+def categories_menu():
+    return module_def.categories_menu(BASE_DONNEES)
+
+def verifier_connexion():
+    return module_def.verifier_connexion()
+
+
 @application.teardown_appcontext
 def fermer_bdd(_erreur):
-    connexion = g.pop("bdd", None)
-    if connexion:
-        connexion.close()
-def date_francaise(valeur):
-    return valeur.strftime("%d/%m/%Y")
-def prochain_identifiant(base, table, colonne):
-    sql = (
-        'SELECT COALESCE(MAX(CAST("' + colonne + '" AS INTEGER)), 0) + 1 AS prochain '
-        + 'FROM "' + table + '"'
-    )
-    return int(base.execute(sql).fetchone()["prochain"])
-def faire_slug(texte):
-    return "-".join(str(texte).strip().lower().split())
-def categories_menu():
-    try:
-        lignes = bdd().execute(
-            "SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY id_categorie"
-        ).fetchall()
-    except Exception:
-        return []
-    return [
-        {
-            "id": l["id_categorie"],
-            "nom": l["nom_categorie"],
-            "slug": faire_slug(l["nom_categorie"]),
-        }
-        for l in lignes
-    ]
-def verifier_connexion():
-    if "utilisateur" not in session:
-        return redirect(url_for("connexion", next=request.path))
-    return None
+    module_def.fermer_bdd(_erreur)
+
+
 @application.context_processor
 def contexte_global():
-    return {
-        "utilisateur": session.get("utilisateur"),
-        "admin_connecte": bool(session.get("admin")),
-        "menu_categories": categories_menu(),
-    }
+    return module_def.contexte_global(BASE_DONNEES)
 @application.route("/")
 def accueil():
     nom = session.get("utilisateur", {}).get("prenom", "")
     return render_template("principal.html", nomutlisateur=nom)
-@application.route("/catalogue/<slug>")
-def catalogue(slug):
+@application.route("/catalogue/<categorie_url>")
+def catalogue(categorie_url):
     base = bdd()
     recherche = request.args.get("q", "").strip().lower()
-    categorie = base.execute(
+    # On récupère toutes les catégories depuis la base.
+    toutes_categories = base.execute(
         "SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY id_categorie"
     ).fetchall()
-    categorie = next((c for c in categorie if faire_slug(c["nom_categorie"]) == slug), None)
-    if not categorie:
+
+    # On cherche manuellement la catégorie qui correspond à l'URL.
+    categorie_trouvee = None
+    for c in toutes_categories:
+        if faire_slug(c["nom_categorie"]) == categorie_url:
+            categorie_trouvee = c
+            break
+
+    # Si l'URL ne correspond à aucune catégorie, on renvoie vers l'accueil.
+    if categorie_trouvee is None:
         return redirect(url_for("accueil"))
-    params = [categorie["id_categorie"]]
-    filtre = ""
-    if recherche:
-        motif = "%" + recherche + "%"
-        filtre = " AND (LOWER(nom_livre) LIKE ? OR LOWER(auteur_livre) LIKE ? OR CAST(ISBN_livre AS TEXT) LIKE ?)"
-        params.extend([motif, motif, motif])
     livres = [
         dict(x)
         for x in base.execute(
@@ -79,24 +71,41 @@ def catalogue(slug):
                 id_livre,
                 nom_livre,
                 auteur_livre,
-                CAST(ISBN_livre AS TEXT) AS ISBN_livre,
+                ISBN_livre,
                 resume,
                 image,
-                COALESCE(total_exemplaires, 1) AS total_exemplaires,
-                COALESCE(total_exemplaires, 1) AS exemplaires_restants
+                total_exemplaires
             FROM LIVRE
             WHERE id_categorie = ?
-            """
-            + filtre
-            + " ORDER BY nom_livre",
-            params,
+            ORDER BY nom_livre
+            """,
+            (categorie_trouvee["id_categorie"],),
         ).fetchall()
     ]
-    for l in livres:
-        l["disponible"] = 1 if int(l["exemplaires_restants"] or 0) > 0 else 0
+    if recherche:
+        livres = [
+            l for l in livres
+            if recherche in str(l.get("nom_livre", "")).lower()
+            or recherche in str(l.get("auteur_livre", "")).lower()
+            or recherche in str(l.get("ISBN_livre", "")).lower()
+        ]
+    # On prépare les données pour l'affichage HTML.
+    for livre in livres:
+        # Force l'ISBN en texte pour éviter les soucis d'affichage (None, nombre, etc.).
+        livre["ISBN_livre"] = str(livre.get("ISBN_livre") or "")
+        # Si le stock est vide ou NULL en base, on met 1 par défaut.
+        livre["total_exemplaires"] = int(livre.get("total_exemplaires") or 1)
+        # Ici on affiche le même nombre en "restants" (version simple du projet).
+        livre["exemplaires_restants"] = int(livre["total_exemplaires"])
+        # Drapeau utile pour le template: 1 = disponible, 0 = indisponible.
+        livre["disponible"] = 1 if int(livre["exemplaires_restants"] or 0) > 0 else 0
     return render_template(
         "catalogue.html",
-        categorie={"id": categorie["id_categorie"], "nom": categorie["nom_categorie"], "slug": slug},
+        categorie={
+            "id": categorie_trouvee["id_categorie"],
+            "nom": categorie_trouvee["nom_categorie"],
+            "categorie_url": categorie_url,
+        },
         livres=livres,
         recherche=recherche,
     )
@@ -104,31 +113,32 @@ def catalogue(slug):
 def cddvd():
     base = bdd()
     recherche = request.args.get("q", "").strip().lower()
-    params = []
-    filtre = ""
-    if recherche:
-        motif = "%" + recherche + "%"
-        filtre = ' WHERE LOWER(c."nom_CD/DVD") LIKE ? OR LOWER(COALESCE(c."artiste_CD/DVD", \"\")) LIKE ?'
-        params = [motif, motif]
     cddvds = [
         dict(x)
         for x in base.execute(
             """
             SELECT
-                c."id_CD/DVD" AS id_cd_dvd,
-                c."nom_CD/DVD" AS nom_cd_dvd,
-                c."annee_CD/DVD" AS annee_cd_dvd,
-                c."artiste_CD/DVD" AS artiste_cd_dvd,
-                c.image,
-                COALESCE(c.total_exemplaires, 1) AS total_exemplaires,
-                COALESCE(c.total_exemplaires, 1) AS exemplaires_restants
-            FROM "CD/DVD" c
-            """
-            + filtre
-            + ' ORDER BY c."nom_CD/DVD"',
-            params,
+                cddvd.id_cd_dvd,
+                cddvd.nom_cd_dvd,
+                cddvd.annee_cd_dvd,
+                cddvd.artiste_cd_dvd,
+                cddvd.image,
+                cddvd.total_exemplaires
+            FROM cddvd
+            ORDER BY cddvd.nom_cd_dvd
+            """,
         ).fetchall()
     ]
+    if recherche:
+        cddvds = [
+            c for c in cddvds
+            if recherche in str(c.get("nom_cd_dvd", "")).lower()
+            or recherche in str(c.get("artiste_cd_dvd", "")).lower()
+            or recherche in str(c.get("id_cd_dvd", "")).lower()
+        ]
+    for item in cddvds:
+        item["total_exemplaires"] = int(item.get("total_exemplaires") or 1)
+        item["exemplaires_restants"] = int(item["total_exemplaires"])
     return render_template("cddvd.html", cddvds=cddvds, recherche=recherche)
 @application.route("/reserver", methods=["GET", "POST"])
 def reserver():
@@ -138,15 +148,15 @@ def reserver():
     base = bdd()
     message = None
     erreur = None
-    uid = session["utilisateur"]["id"]
+    utilisateur_id = session["utilisateur"]["id"]
     def creer_resa():
-        rid = prochain_identifiant(base, "RESERVATION", "id_reservation")
+        reservation_id = prochain_identifiant(base, "RESERVATION", "id_reservation")
         auj = date.today()
         base.execute(
-            'INSERT INTO RESERVATION (id_reservation, date_reservation, date_de_retour, "id_client#", bibliotheque_retrait, date_limite_retour, date_retour_effective) VALUES (?, ?, NULL, ?, "Centre-ville", ?, NULL)',
-            (rid, date_francaise(auj), uid, date_francaise(auj + timedelta(days=21))),
+            "INSERT INTO RESERVATION (id_reservation, date_reservation, date_de_retour, id_client, date_limite_retour, date_retour_effective) VALUES (?, ?, NULL, ?, ?, NULL)",
+            (reservation_id, date_francaise(auj), utilisateur_id, date_francaise(auj + timedelta(days=21))),
         )
-        return rid
+        return reservation_id
     if request.method == "POST":
         isbn = request.form.get("isbn", "").strip()
         numero = request.form.get("numero_cd_dvd", "").strip()
@@ -156,28 +166,31 @@ def reserver():
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
             livre = base.execute(
-                'SELECT id_livre, nom_livre FROM LIVRE WHERE CAST(ISBN_livre AS TEXT)=? ORDER BY id_livre LIMIT 1',
+                'SELECT id_livre, nom_livre FROM LIVRE WHERE ISBN_livre=? ORDER BY id_livre LIMIT 1',
                 (isbn,),
             ).fetchone()
             if not livre:
                 erreur = "Livre introuvable pour cet ISBN."
             else:
-                rid = creer_resa()
-                base.execute('INSERT INTO "LIGNE LIVRE" ("id_livre#", "id_reservation#") VALUES (?, ?)', (livre["id_livre"], rid))
+                reservation_id = creer_resa()
+                base.execute(
+                    'INSERT INTO "LIGNE LIVRE" (id_livre, id_reservation) VALUES (?, ?)',
+                    (livre["id_livre"], reservation_id),
+                )
                 base.commit()
                 message = "Réservation enregistrée pour le livre : " + str(livre["nom_livre"])
         else:
             cd = base.execute(
-                'SELECT "id_CD/DVD" AS id_cd_dvd, "nom_CD/DVD" AS nom_cd_dvd FROM "CD/DVD" WHERE "id_CD/DVD"=?',
+                "SELECT id_cd_dvd, nom_cd_dvd FROM cddvd WHERE id_cd_dvd=?",
                 (numero,),
             ).fetchone()
             if not cd:
                 erreur = "CD/DVD introuvable pour ce numéro."
             else:
-                rid = creer_resa()
+                reservation_id = creer_resa()
                 base.execute(
-                    'INSERT INTO "LIGNE CD/DVD" ("id_CD/DVD#", "id_reservation#", date_de_retour) VALUES (?, ?, NULL)',
-                    (cd["id_cd_dvd"], rid),
+                    "INSERT INTO ligne_cddvd (id_cd_dvd, id_reservation, date_de_retour) VALUES (?, ?, NULL)",
+                    (cd["id_cd_dvd"], reservation_id),
                 )
                 base.commit()
                 message = "Réservation enregistrée pour le CD/DVD : " + str(cd["nom_cd_dvd"])
@@ -188,7 +201,7 @@ def reserver():
         WHERE id_client = ?
         ORDER BY id_reservation DESC
         """,
-        (uid,),
+        (utilisateur_id,),
     ).fetchall()
     return render_template("reserver.html", message=message, erreur=erreur, historique=historique)
 @application.route("/mes_reservations")
@@ -198,7 +211,7 @@ def mes_reservations():
         return redirection
     reservations = bdd().execute(
         """
-        SELECT type_media, id_reservation, nom_media, auteur_media, reference_media, date_reservation, date_limite_retour, bibliotheque_retrait, date_retour_effective
+        SELECT type_media, id_reservation, nom_media, auteur_media, reference_media, date_reservation, date_limite_retour, date_retour_effective
         FROM VUE_MES_RESERVATIONS
         WHERE id_client = ?
         ORDER BY id_reservation DESC
@@ -214,7 +227,7 @@ def rendre():
     base = bdd()
     message = None
     erreur = None
-    uid = session["utilisateur"]["id"]
+    utilisateur_id = session["utilisateur"]["id"]
     if request.method == "POST":
         isbn = request.form.get("isbn", "").strip()
         numero = request.form.get("numero_cd_dvd", "").strip()
@@ -224,8 +237,8 @@ def rendre():
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
             resa = base.execute(
-                'SELECT r.id_reservation, l.nom_livre FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll."id_reservation#"=r.id_reservation JOIN LIVRE l ON l.id_livre=ll."id_livre#" WHERE r."id_client#"=? AND CAST(l.ISBN_livre AS TEXT)=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
-                (uid, isbn),
+                'SELECT r.id_reservation, l.nom_livre FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
+                (utilisateur_id, isbn),
             ).fetchone()
             if not resa:
                 erreur = "Aucune réservation active pour cet ISBN."
@@ -238,18 +251,18 @@ def rendre():
                 message = "Retour enregistré pour le livre : " + str(resa["nom_livre"])
         else:
             resa = base.execute(
-                'SELECT r.id_reservation, c."nom_CD/DVD" AS nom_cd_dvd FROM RESERVATION r JOIN "LIGNE CD/DVD" lcd ON lcd."id_reservation#"=r.id_reservation JOIN "CD/DVD" c ON c."id_CD/DVD"=lcd."id_CD/DVD#" WHERE r."id_client#"=? AND lcd."id_CD/DVD#"=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
-                (uid, numero),
+                "SELECT r.id_reservation, cddvd.nom_cd_dvd FROM RESERVATION r JOIN ligne_cddvd ON ligne_cddvd.id_reservation = r.id_reservation JOIN cddvd ON cddvd.id_cd_dvd = ligne_cddvd.id_cd_dvd WHERE r.id_client=? AND ligne_cddvd.id_cd_dvd=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
+                (utilisateur_id, numero),
             ).fetchone()
             if not resa:
-                erreur = "Aucune réservation active pour ce numéro CD/DVD."
+                erreur = "Aucune réservation pour ce numéro CD/DVD."
             else:
                 base.execute(
                     "UPDATE RESERVATION SET date_retour_effective=?, date_de_retour=? WHERE id_reservation=?",
                     (date_francaise(date.today()), date_francaise(date.today()), resa["id_reservation"]),
                 )
                 base.execute(
-                    'UPDATE "LIGNE CD/DVD" SET date_de_retour=? WHERE "id_reservation#"=?',
+                    "UPDATE ligne_cddvd SET date_de_retour=? WHERE id_reservation=?",
                     (date_francaise(date.today()), resa["id_reservation"]),
                 )
                 base.commit()
@@ -318,7 +331,11 @@ def creer_compte():
             if adm:
                 base.execute("UPDATE WEB_ADMIN SET mot_de_passe_hash=? WHERE id_admin=?", (mdp_hash, adm["id_admin"]))
             else:
-                base.execute("INSERT INTO WEB_ADMIN (nom_utilisateur, mot_de_passe_hash) VALUES (?, ?)", ("admin", mdp_hash))
+                return render_template(
+                    "connexion.html",
+                    erreur="Compte admin non configuré en base (WEB_ADMIN).",
+                    prochain=prochain,
+                )
         base.commit()
     except sqlite3.IntegrityError:
         return render_template("connexion.html", erreur="Cet e-mail ou ce nom d'utilisateur existe déjà.", prochain=prochain)
@@ -331,21 +348,36 @@ def creer_compte():
 @application.route("/statistiques")
 def autres():
     base = bdd()
-    nb_clients = int(base.execute("SELECT COUNT(*) AS total FROM CLIENT").fetchone()["total"])
+    nb_clients = int(base.execute("SELECT COUNT(*) FROM CLIENT").fetchone()[0])
     nb_actives = int(
-        base.execute("SELECT COUNT(*) AS total FROM RESERVATION WHERE date_retour_effective IS NULL").fetchone()["total"]
+        base.execute("SELECT COUNT(*) FROM RESERVATION WHERE date_retour_effective IS NULL").fetchone()[0]
     )
+    graph_image = ""
+    graph_info = ""
+    total_connexions = nb_clients + nb_actives
+    try:
+        from matplotlib.figure import Figure
+        figure = Figure(figsize=(4.8, 2.4))
+        axe = figure.add_subplot(111)
+        axe.bar(["Clients", "Réservations"], [nb_clients, nb_actives], color=["#2f7bde", "#18a67a"])
+        axe.set_title("Vue rapide")
+        tampon = BytesIO()
+        figure.tight_layout()
+        figure.savefig(tampon, format="png")
+        graph_image = base64.b64encode(tampon.getvalue()).decode("utf-8")
+    except Exception:
+        graph_info = "Graphique indisponible sur cet environnement."
     return render_template(
         "autres.html",
-        graph_image=None,
-        graph_info="Graphique non activé.",
+        graph_image=graph_image,
+        graph_info=graph_info,
         nb_clients_web=nb_clients,
         nb_clients_initial=nb_clients,
         nb_reservations_actives=nb_actives,
         top_livres_demandes=[],
         top_cds_demandes=[],
         top_dvds_demandes=[],
-        total_connexions=0,
+        total_connexions=total_connexions,
     )
 @application.route("/admin", methods=["GET", "POST"])
 def admin():
@@ -354,6 +386,9 @@ def admin():
     base = bdd()
     message = None
     erreur = None
+    categories = [dict(x) for x in base.execute(
+        "SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY nom_categorie"
+    ).fetchall()]
     if request.method == "POST":
         action = request.form.get("action", "").strip()
         isbn = request.form.get("isbn_livre", "").strip()
@@ -361,39 +396,46 @@ def admin():
             erreur = "ISBN obligatoire."
         elif action == "ajouter":
             nom = request.form.get("nom_livre", "").strip()
+            categorie_choisie = request.form.get("id_categorie", "").strip()
             if not nom:
                 erreur = "Nom du livre obligatoire."
+            elif not categorie_choisie:
+                erreur = "Choisis une catégorie."
             else:
-                existe = base.execute("SELECT 1 FROM LIVRE WHERE CAST(ISBN_livre AS TEXT)=? LIMIT 1", (isbn,)).fetchone()
-                cat = base.execute("SELECT id_categorie FROM CATEGORIE ORDER BY id_categorie LIMIT 1").fetchone()
+                existe = base.execute("SELECT 1 FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
                 if existe:
                     erreur = "Un livre avec cet ISBN existe déjà."
-                elif not cat:
-                    erreur = "Aucune catégorie trouvée en base."
                 else:
                     base.execute(
                         'INSERT INTO LIVRE (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires) VALUES (?, ?, NULL, NULL, ?, ?, NULL, NULL, 1)',
-                        (nom, "Inconnu", int(cat["id_categorie"]), isbn),
+                        (nom, "Inconnu", int(categorie_choisie), isbn),
                     )
                     base.commit()
                     message = "Livre ajouté."
         elif action == "supprimer":
-            livre = base.execute("SELECT 1 FROM LIVRE WHERE CAST(ISBN_livre AS TEXT)=? LIMIT 1", (isbn,)).fetchone()
+            livre = base.execute("SELECT 1 FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
             if not livre:
                 erreur = "Aucun livre trouvé pour cet ISBN."
             else:
-                base.execute("UPDATE LIVRE SET total_exemplaires = 0 WHERE CAST(ISBN_livre AS TEXT)=?", (isbn,))
+                base.execute("UPDATE LIVRE SET total_exemplaires = 0 WHERE ISBN_livre=?", (isbn,))
                 base.commit()
                 message = "Livre marqué comme supprimé."
         else:
             erreur = "Action inconnue."
-    livres = base.execute(
-        'SELECT nom_livre, CAST(ISBN_livre AS TEXT) AS ISBN_livre FROM LIVRE ORDER BY id_livre DESC LIMIT 30'
-    ).fetchall()
-    return render_template("admin.html", livres=livres, erreur=erreur, message=message)
+    livres = [dict(x) for x in base.execute("SELECT nom_livre, ISBN_livre FROM LIVRE ORDER BY id_livre DESC LIMIT 30").fetchall()]
+    for livre in livres:
+        livre["ISBN_livre"] = str(livre.get("ISBN_livre") or "")
+    return render_template("admin.html", livres=livres, categories=categories, erreur=erreur, message=message)
 @application.route("/deconnexion")
 def deconnexion():
     session.clear()
     return redirect(url_for("accueil"))
 if __name__ == "__main__":
     application.run(debug=True)
+
+
+
+
+
+
+
