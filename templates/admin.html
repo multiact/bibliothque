@@ -3,53 +3,74 @@
 {% block title %}Administration{% endblock %}
 
 {% block content %}
-<h1>Administration</h1>
-<p>Ajout et suppression de livre par ISBN.</p>
+<div class="bloc-principal">
+    <h1>Panneau d'Administration</h1>
+    <p>Gère le catalogue de la bibliothèque (ajout et retrait de livres).</p>
 
-{% if erreur %}
-<div class="error">{{ erreur }}</div>
-{% endif %}
-{% if message %}
-<div class="ok">{{ message }}</div>
-{% endif %}
+    {% if erreur %}
+    <div class="message-erreur">{{ erreur }}</div>
+    {% endif %}
+    {% if message %}
+    <div class="message-valide">{{ message }}</div>
+    {% endif %}
 
-<div class="card">
-    <h2>Ajouter un livre</h2>
-    <form method="POST" action="{{ url_for('admin') }}">
-        <input type="hidden" name="action" value="ajouter">
-        <label>Nom du livre</label>
-        <input type="text" name="nom_livre" required>
+    <div class="grille-admin">
+        <div class="formulaire formulaire-admin">
+            <h2>Ajouter un livre</h2>
+            <form method="POST" action="{{ url_for('admin') }}" class="formulaire-simple">
+                <input type="hidden" name="action" value="ajouter">
+                
+                <div class="champ-formulaire">
+                    <label>Nom du livre</label>
+                    <input type="text" name="nom_livre" required>
+                </div>
 
-        <label>Catégorie</label>
-        <select name="id_categorie" required>
-            <option value="">Choisir une catégorie</option>
-            {% for categorie in categories %}
-            <option value="{{ categorie['id_categorie'] }}">{{ categorie['nom_categorie'] }}</option>
+                <div class="champ-formulaire">
+                    <label>Catégorie</label>
+                    <select name="id_categorie" required>
+                        <option value="">Choisir une catégorie...</option>
+                        {% for categorie in categories %}
+                        <option value="{{ categorie['id_categorie'] }}">{{ categorie['nom_categorie'] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="champ-formulaire">
+                    <label>Numéro ISBN</label>
+                    <input type="text" name="isbn_livre" required>
+                </div>
+
+                <button type="submit">Ajouter au catalogue</button>
+            </form>
+        </div>
+
+        <div class="formulaire formulaire-admin">
+            <h2>Retirer un livre</h2>
+            <form method="POST" action="{{ url_for('admin') }}" class="formulaire-simple">
+                <input type="hidden" name="action" value="supprimer">
+                
+                <div class="champ-formulaire">
+                    <label>ISBN du livre à supprimer</label>
+                    <input type="text" name="isbn_livre" required>
+                </div>
+
+                <button type="submit">Supprimer le livre</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="zone-historique">
+        <h2>Derniers livres ajoutés</h2>
+        <div class="liste-admin">
+            {% for livre in livres %}
+            <div class="ligne-historique">
+                <strong>{{ livre['nom_livre'] }}</strong>
+                <span>(ISBN : {{ livre['ISBN_livre'] }})</span>
+            </div>
+            {% else %}
+            <p>Aucun livre dans le catalogue pour le moment.</p>
             {% endfor %}
-        </select>
-
-        <label>ISBN</label>
-        <input type="text" name="isbn_livre" required>
-        <button type="submit">Ajouter</button>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Supprimer un livre</h2>
-    <form method="POST" action="{{ url_for('admin') }}">
-        <input type="hidden" name="action" value="supprimer">
-        <label>ISBN</label>
-        <input type="text" name="isbn_livre" required>
-        <button type="submit">Supprimer</button>
-    </form>
-</div>
-
-<div class="card">
-    <h2>Derniers livres</h2>
-    {% for livre in livres %}
-    <div class="row"><strong>{{ livre['nom_livre'] }}</strong> - ISBN {{ livre['ISBN_livre'] }}</div>
-    {% else %}
-    <div class="row">Aucun livre pour le moment.</div>
-    {% endfor %}
+        </div>
+    </div>
 </div>
 {% endblock %}

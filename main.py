@@ -6,34 +6,23 @@ import importlib
 import sqlite3
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
-from matplotlib.figure import Figure
 import database
 application = Flask(__name__)
 application.secret_key = "cle_secrete_bibliotheque"
 BASE_DONNEES = database.BASE_DONNEES
 
 
-# Import du module utilitaire def.py
-module_def = importlib.import_module("def")
-module_def.BASE_DONNEES = BASE_DONNEES
-
-# Appels des fonctions de def.py 
-bdd = module_def.bdd
-date_francaise = module_def.date_francaise
-prochain_identifiant = module_def.prochain_identifiant
-faire_slug = module_def.faire_slug
-categories_menu = module_def.categories_menu
-verifier_connexion = module_def.verifier_connexion
+from fonctions import *
 
 
 @application.teardown_appcontext
-def fermer_bdd(_erreur):
-    module_def.fermer_bdd(_erreur)
+def nettoyage_bdd(_erreur):
+    fermer_bdd(_erreur)
 
 
 @application.context_processor
-def contexte_global():
-    return module_def.contexte_global(BASE_DONNEES)
+def injecter_contexte():
+    return contexte_global(BASE_DONNEES)
 @application.route("/")
 def accueil():
     nom = session.get("utilisateur", {}).get("prenom", "")
@@ -68,7 +57,8 @@ def catalogue(categorie_url):
                 ISBN_livre,
                 resume,
                 image,
-                total_exemplaires
+                total_exemplaires,
+                disponibilité
             FROM LIVRE
             WHERE id_categorie = ?
             ORDER BY nom_livre
@@ -85,14 +75,10 @@ def catalogue(categorie_url):
         ]
     # On prépare les données pour l'affichage HTML.
     for livre in livres:
-        # Force l'ISBN en texte pour éviter les soucis d'affichage (None, nombre, etc.).
         livre["ISBN_livre"] = str(livre.get("ISBN_livre") or "")
-        # Si le stock est vide ou NULL en base, on met 1 par défaut.
         livre["total_exemplaires"] = int(livre.get("total_exemplaires") or 1)
-        # Ici on affiche le même nombre en "restants" (version simple du projet).
-        livre["exemplaires_restants"] = int(livre["total_exemplaires"])
-        # Drapeau utile pour le template: 1 = disponible, 0 = indisponible.
-        livre["disponible"] = 1 if int(livre["exemplaires_restants"] or 0) > 0 else 0
+        livre["exemplaires_restants"] = int(livre.get("disponibilité") or 0)
+        livre["disponible"] = 1 if livre["exemplaires_restants"] > 0 else 0
     return render_template(
         "catalogue.html",
         categorie={
@@ -159,17 +145,27 @@ def reserver():
         elif isbn and numero:
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
+            # On récupère le livre ET sa disponibilité actuelle
             livre = base.execute(
-                'SELECT id_livre, nom_livre FROM LIVRE WHERE ISBN_livre=? ORDER BY id_livre LIMIT 1',
+                'SELECT id_livre, nom_livre, disponibilité FROM LIVRE WHERE ISBN_livre=? ORDER BY id_livre LIMIT 1',
                 (isbn,),
             ).fetchone()
+            
             if not livre:
                 erreur = "Livre introuvable pour cet ISBN."
+            elif int(livre.get("disponibilité") or 0) <= 0:
+                # L'ardoise est à 0, on bloque la réservation !
+                erreur = "Ce livre est actuellement indisponible."
             else:
                 reservation_id = creer_resa()
                 base.execute(
                     'INSERT INTO "LIGNE LIVRE" (id_livre, id_reservation) VALUES (?, ?)',
                     (livre["id_livre"], reservation_id),
+                )
+                # NOUVEAU : On baisse le stock de 1
+                base.execute(
+                    'UPDATE LIVRE SET disponibilité = disponibilité - 1 WHERE id_livre=?',
+                    (livre["id_livre"],)
                 )
                 base.commit()
                 message = "Réservation enregistrée pour le livre : " + str(livre["nom_livre"])
@@ -231,9 +227,10 @@ def rendre():
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
             resa = base.execute(
-                'SELECT r.id_reservation, l.nom_livre FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
+                'SELECT r.id_reservation, l.id_livre, l.nom_livre FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
                 (utilisateur_id, isbn),
             ).fetchone()
+            
             if not resa:
                 erreur = "Aucune réservation active pour cet ISBN."
             else:
@@ -241,11 +238,16 @@ def rendre():
                     "UPDATE RESERVATION SET date_retour_effective=?, date_de_retour=? WHERE id_reservation=?",
                     (date_francaise(date.today()), date_francaise(date.today()), resa["id_reservation"]),
                 )
+                # NOUVEAU : On remonte le stock de 1
+                base.execute(
+                    'UPDATE LIVRE SET disponibilité = disponibilité + 1 WHERE id_livre=?',
+                    (resa["id_livre"],)
+                )
                 base.commit()
                 message = "Retour enregistré pour le livre : " + str(resa["nom_livre"])
         else:
             resa = base.execute(
-                "SELECT r.id_reservation, cddvd.nom_cd_dvd FROM RESERVATION r JOIN ligne_cddvd ON ligne_cddvd.id_reservation = r.id_reservation JOIN cddvd ON cddvd.id_cd_dvd = ligne_cddvd.id_cd_dvd WHERE r.id_client=? AND ligne_cddvd.id_cd_dvd=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
+                "SELECT r.id_reservation, cddvd.id_cd_dvd, cddvd.nom_cd_dvd FROM RESERVATION r JOIN ligne_cddvd ON ligne_cddvd.id_reservation = r.id_reservation JOIN cddvd ON cddvd.id_cd_dvd = ligne_cddvd.id_cd_dvd WHERE r.id_client=? AND ligne_cddvd.id_cd_dvd=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
                 (utilisateur_id, numero),
             ).fetchone()
             if not resa:
@@ -267,33 +269,41 @@ def connexion():
     base = bdd()
     erreur = None
     prochain = request.values.get("next") or url_for("accueil")
+    
     if request.method == "POST":
+        # On récupère ce que l'utilisateur a tapé
         identifiant = request.form.get("email", "").strip().lower()
         mot_de_passe = request.form.get("password", "")
+        
+        # On cherche l'utilisateur par son e-mail OU son nom d'utilisateur
         utilisateur = base.execute(
             "SELECT * FROM CLIENT WHERE (LOWER(adressemail_client)=? OR LOWER(COALESCE(nom_utilisateur,''))=?) AND mot_de_passe IS NOT NULL LIMIT 1",
             (identifiant, identifiant),
         ).fetchone()
+        
         if not utilisateur:
-            erreur = "Adresse e-mail introuvable."
+            erreur = "Adresse e-mail ou nom d'utilisateur introuvable."
         elif not check_password_hash(utilisateur["mot_de_passe"], mot_de_passe):
             erreur = "Mot de passe incorrect."
         else:
+            # L'utilisateur a donné les bons identifiants, on lui crée son "badge" de base (la session)
             session["utilisateur"] = {
                 "id": utilisateur["id_client"],
                 "prenom": utilisateur["prenom_client"],
                 "nom_utilisateur": utilisateur["nom_utilisateur"],
                 "email": utilisateur["adressemail_client"],
             }
-            est_admin = base.execute(
-                "SELECT 1 FROM WEB_ADMIN WHERE LOWER(nom_utilisateur)=? LIMIT 1",
-                (str(utilisateur["nom_utilisateur"]).lower(),),
-            ).fetchone()
-            if est_admin:
-                session["admin"] = True
+            
+            # On vérifie son rôle (si c'est NULL, ce ne sera pas égal à 1)
+            # IMPORTANT : Il faut que la colonne 'est_admin' existe bien dans la table CLIENT
+            if utilisateur["est_admin"] == 1:
+                session["admin"] = True  # On ajoute le macaron Admin sur son badge
                 return redirect(url_for("admin"))
-            session.pop("admin", None)
-            return redirect(prochain)
+            else:
+                # Si ce n'est pas un admin, on s'assure d'enlever tout macaron Admin résiduel
+                session.pop("admin", None)
+                return redirect(prochain)
+                
     return render_template("connexion.html", erreur=erreur, prochain=prochain)
 @application.route("/creer_compte", methods=["POST"])
 def creer_compte():
@@ -305,39 +315,44 @@ def creer_compte():
     code_postal = request.form.get("code_postal", "").strip()
     email = request.form.get("email", "").strip().lower()
     mot_de_passe = request.form.get("password", "")
+
+    # Vérification que tous les champs sont remplis
     if not all([prenom, nom_utilisateur, date_naissance, code_postal, email, mot_de_passe]):
         return render_template("connexion.html", erreur="Tous les champs sont obligatoires.", prochain=prochain)
+
+    # Vérification si l'utilisateur existe déjà
     deja = base.execute(
         "SELECT 1 FROM CLIENT WHERE LOWER(adressemail_client)=? OR LOWER(COALESCE(nom_utilisateur,''))=? LIMIT 1",
         (email, nom_utilisateur.lower()),
     ).fetchone()
+
     if deja:
         return render_template("connexion.html", erreur="Cet e-mail ou ce nom d'utilisateur existe déjà.", prochain=prochain)
+
     try:
-        mdp_hash = generate_password_hash("lisette") if nom_utilisateur.lower() == "admin" else generate_password_hash(mot_de_passe)
+        # NOUVEAU : On hache TOUJOURS le mot de passe tapé par l'utilisateur (plus de mot de passe forcé !)
+        mdp_hash = generate_password_hash(mot_de_passe)
         cid = prochain_identifiant(base, "CLIENT", "id_client")
+        
+        # NOUVEAU : Dans l'INSERT INTO, on ajoute "est_admin" à la fin de la liste des colonnes, 
+        # et on met un "0" écrit en dur à la fin des valeurs. Tout nouveau compte est un client.
         base.execute(
-            'INSERT INTO CLIENT (id_client, nom_client, prenom_client, adressepostale_client, adressemail_client, date_naissance_client, telephone_client, nom_utilisateur, mot_de_passe, date_creation, code_postal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO CLIENT (id_client, nom_client, prenom_client, adressepostale_client, adressemail_client, date_naissance_client, telephone_client, nom_utilisateur, mot_de_passe, date_creation, code_postal, est_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
             (cid, nom_utilisateur, prenom, code_postal, email, date_naissance, None, nom_utilisateur, mdp_hash, date_francaise(date.today()), code_postal),
         )
-        if nom_utilisateur.lower() == "admin":
-            adm = base.execute("SELECT id_admin FROM WEB_ADMIN WHERE LOWER(nom_utilisateur)=? LIMIT 1", ("admin",)).fetchone()
-            if adm:
-                base.execute("UPDATE WEB_ADMIN SET mot_de_passe_hash=? WHERE id_admin=?", (mdp_hash, adm["id_admin"]))
-            else:
-                return render_template(
-                    "connexion.html",
-                    erreur="Compte admin non configuré en base (WEB_ADMIN).",
-                    prochain=prochain,
-                )
         base.commit()
     except sqlite3.IntegrityError:
         return render_template("connexion.html", erreur="Cet e-mail ou ce nom d'utilisateur existe déjà.", prochain=prochain)
+
+    # On crée le badge de session classique pour cet utilisateur fraîchement inscrit
     session["utilisateur"] = {"id": cid, "prenom": prenom, "nom_utilisateur": nom_utilisateur, "email": email}
-    if nom_utilisateur.lower() == "admin":
-        session["admin"] = True
-        return redirect(url_for("admin"))
+    
+    # NOUVEAU : Par sécurité, on s'assure de retirer tout macaron "admin" résiduel de la session
+    session.pop("admin", None)
+    
     return redirect(prochain)
+
+
 @application.route("/autres")
 @application.route("/statistiques")
 def autres():
@@ -422,51 +437,60 @@ def autres():
         top_livres_demandes=top_livres_demandes,
     )
 @application.route("/admin", methods=["GET", "POST"])
+@application.route("/admin", methods=["GET", "POST"])
 def admin():
     if not session.get("admin"):
         return redirect(url_for("connexion", next=url_for("admin")))
+    
     base = bdd()
     message = None
     erreur = None
+    
     categories = [dict(x) for x in base.execute(
         "SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY nom_categorie"
     ).fetchall()]
+    
     if request.method == "POST":
         action = request.form.get("action", "").strip()
         isbn = request.form.get("isbn_livre", "").strip()
+        
         if not isbn:
-            erreur = "ISBN obligatoire."
+            erreur = "L'ISBN est obligatoire."
         elif action == "ajouter":
             nom = request.form.get("nom_livre", "").strip()
             categorie_choisie = request.form.get("id_categorie", "").strip()
+            
             if not nom:
-                erreur = "Nom du livre obligatoire."
+                erreur = "Le nom du livre est obligatoire."
             elif not categorie_choisie:
-                erreur = "Choisis une catégorie."
+                erreur = "Veuillez choisir une catégorie."
             else:
                 existe = base.execute("SELECT 1 FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
                 if existe:
-                    erreur = "Un livre avec cet ISBN existe déjà."
+                    erreur = "Un livre avec cet ISBN existe déjà dans la base."
                 else:
                     base.execute(
-                        'INSERT INTO LIVRE (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires) VALUES (?, ?, NULL, NULL, ?, ?, NULL, NULL, 1)',
+                        'INSERT INTO LIVRE (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires, disponibilité) VALUES (?, ?, NULL, NULL, ?, ?, NULL, NULL, 1, 1)',
                         (nom, "Inconnu", int(categorie_choisie), isbn),
                     )
                     base.commit()
-                    message = "Livre ajouté."
+                    message = f"Le livre '{nom}' a été ajouté avec succès."
+                    
         elif action == "supprimer":
-            livre = base.execute("SELECT 1 FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
+            livre = base.execute("SELECT nom_livre FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
             if not livre:
                 erreur = "Aucun livre trouvé pour cet ISBN."
             else:
-                base.execute("UPDATE LIVRE SET total_exemplaires = 0 WHERE ISBN_livre=?", (isbn,))
+                base.execute("DELETE FROM LIVRE WHERE ISBN_livre=?", (isbn,))
                 base.commit()
-                message = "Livre marqué comme supprimé."
+                message = f"Le livre '{livre['nom_livre']}' a été définitivement retiré."
         else:
             erreur = "Action inconnue."
+            
     livres = [dict(x) for x in base.execute("SELECT nom_livre, ISBN_livre FROM LIVRE ORDER BY id_livre DESC LIMIT 30").fetchall()]
     for livre in livres:
         livre["ISBN_livre"] = str(livre.get("ISBN_livre") or "")
+        
     return render_template("admin.html", livres=livres, categories=categories, erreur=erreur, message=message)
 @application.route("/deconnexion")
 def deconnexion():
@@ -474,13 +498,3 @@ def deconnexion():
     return redirect(url_for("accueil"))
 if __name__ == "__main__":
     application.run(debug=True)
-
-
-
-
-
-
-
-
-
-

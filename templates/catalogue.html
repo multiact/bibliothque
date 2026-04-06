@@ -24,12 +24,21 @@
         <p><strong>ISBN :</strong> {{ livre["ISBN_livre"] }}</p>
         <p><strong>Exemplaires restants :</strong> {{ livre["exemplaires_restants"] }} / {{ livre["total_exemplaires"] }}</p>
         <p>{{ livre["resume"] or "Résumé non renseigné." }}</p>
+        <div class="infos-stock">
+            <p>Exemplaires disponibles : <strong>{{ livre.exemplaires_restants }}</strong></p>
 
-        {% if livre["disponible"] == 1 %}
-            <p class="disponible">Disponible</p>
-        {% else %}
-            <p class="indisponible">Indisponible</p>
-        {% endif %}
+            {% if livre.disponible == 1 %}
+                <form action="{{ url_for('reserver') }}" method="POST">
+                    <input type="hidden" name="isbn" value="{{ livre.ISBN_livre }}">
+                    <button type="submit" class="bouton-reserver">Réserver ce livre</button>
+                </form>
+            {% else %}
+                <div class="alerte-rupture">
+                    <p>Ce manuel est actuellement en cours d'utilisation par d'autres élèves.</p>
+                    <button disabled class="bouton-indisponible">Indisponible</button>
+                </div>
+            {% endif %}
+        </div>
     </div>
     {% else %}
     <p>Aucun livre trouvé pour cette recherche.</p>
