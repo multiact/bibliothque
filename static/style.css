@@ -215,10 +215,15 @@ img{
     font-weight:bold;
 }
 .formulaire input,
-.formulaire select{
+.formulaire select,
+.formulaire textarea{
     width:100%;
     padding:12px;
     border:1px solid var(--gris-clair);
+}
+.formulaire textarea{
+    resize:vertical;
+    min-height:110px;
 }
 .formulaire button{
     padding:14px 20px;
@@ -378,6 +383,36 @@ img{
     justify-content:center;
     color:var(--gris);
     background:#f7f9fb;
+}
+.infos-stock{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--gris-clair);
+}
+.bouton-reserver{
+    display:inline-block;
+    border:none;
+    border-radius:8px;
+    background:var(--rose);
+    color:#fff;
+    font-weight:bold;
+    padding:10px 14px;
+    cursor:pointer;
+}
+.bouton-reserver:hover{
+    background:var(--rose-fonce);
+}
+.bouton-indisponible{
+    border:none;
+    border-radius:8px;
+    background:#a7b1ba;
+    color:#fff;
+    font-weight:bold;
+    padding:10px 14px;
+    cursor:not-allowed;
+}
+.alerte-rupture p{
+    margin:0 0 8px 0;
 }
 .table-conteneur{
     overflow:auto;

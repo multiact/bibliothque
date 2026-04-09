@@ -4,8 +4,8 @@
 
 {% block content %}
 <div class="bloc-principal">
-    <h1>Panneau d'Administration</h1>
-    <p>Gère le catalogue de la bibliothèque (ajout et retrait de livres).</p>
+    <h1>Panneau d'administration</h1>
+    <p>Gere le catalogue de la bibliotheque (ajout et retrait de livres).</p>
 
     {% if erreur %}
     <div class="message-erreur">{{ erreur }}</div>
@@ -19,16 +19,21 @@
             <h2>Ajouter un livre</h2>
             <form method="POST" action="{{ url_for('admin') }}" class="formulaire-simple">
                 <input type="hidden" name="action" value="ajouter">
-                
+
                 <div class="champ-formulaire">
                     <label>Nom du livre</label>
                     <input type="text" name="nom_livre" required>
                 </div>
 
                 <div class="champ-formulaire">
-                    <label>Catégorie</label>
+                    <label>Auteur</label>
+                    <input type="text" name="auteur_livre" placeholder="Ex: Victor Hugo">
+                </div>
+
+                <div class="champ-formulaire">
+                    <label>Categorie</label>
                     <select name="id_categorie" required>
-                        <option value="">Choisir une catégorie...</option>
+                        <option value="">Choisir une categorie...</option>
                         {% for categorie in categories %}
                         <option value="{{ categorie['id_categorie'] }}">{{ categorie['nom_categorie'] }}</option>
                         {% endfor %}
@@ -36,8 +41,13 @@
                 </div>
 
                 <div class="champ-formulaire">
-                    <label>Numéro ISBN</label>
+                    <label>Numero ISBN</label>
                     <input type="text" name="isbn_livre" required>
+                </div>
+
+                <div class="champ-formulaire">
+                    <label>Description</label>
+                    <textarea name="resume_livre" rows="4" placeholder="Courte description du livre..."></textarea>
                 </div>
 
                 <button type="submit">Ajouter au catalogue</button>
@@ -48,9 +58,9 @@
             <h2>Retirer un livre</h2>
             <form method="POST" action="{{ url_for('admin') }}" class="formulaire-simple">
                 <input type="hidden" name="action" value="supprimer">
-                
+
                 <div class="champ-formulaire">
-                    <label>ISBN du livre à supprimer</label>
+                    <label>ISBN du livre a supprimer</label>
                     <input type="text" name="isbn_livre" required>
                 </div>
 
@@ -60,7 +70,7 @@
     </div>
 
     <div class="zone-historique">
-        <h2>Derniers livres ajoutés</h2>
+        <h2>Derniers livres ajoutes</h2>
         <div class="liste-admin">
             {% for livre in livres %}
             <div class="ligne-historique">

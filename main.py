@@ -6,6 +6,10 @@ import importlib
 import sqlite3
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = None
 import database
 application = Flask(__name__)
 application.secret_key = "cle_secrete_bibliotheque"
@@ -13,6 +17,21 @@ BASE_DONNEES = database.BASE_DONNEES
 
 
 from fonctions import *
+
+
+def _identifiant_sql(nom):
+    return '"' + str(nom).replace('"', '""') + '"'
+
+
+def table_ligne_livre(base):
+    for candidat in ("ligne_livre", "LIGNE LIVRE"):
+        trouvee = base.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (candidat,),
+        ).fetchone()
+        if trouvee:
+            return _identifiant_sql(trouvee["name"])
+    return _identifiant_sql("ligne_livre")
 
 
 @application.teardown_appcontext
@@ -129,6 +148,7 @@ def reserver():
     message = None
     erreur = None
     utilisateur_id = session["utilisateur"]["id"]
+    nom_table_ligne = table_ligne_livre(base)
     def creer_resa():
         reservation_id = prochain_identifiant(base, "RESERVATION", "id_reservation")
         auj = date.today()
@@ -153,13 +173,13 @@ def reserver():
             
             if not livre:
                 erreur = "Livre introuvable pour cet ISBN."
-            elif int(livre.get("disponibilité") or 0) <= 0:
+            elif int(livre["disponibilité"] or 0) <= 0:
                 # L'ardoise est à 0, on bloque la réservation !
                 erreur = "Ce livre est actuellement indisponible."
             else:
                 reservation_id = creer_resa()
                 base.execute(
-                    'INSERT INTO "LIGNE LIVRE" (id_livre, id_reservation) VALUES (?, ?)',
+                    f"INSERT INTO {nom_table_ligne} (id_livre, id_reservation) VALUES (?, ?)",
                     (livre["id_livre"], reservation_id),
                 )
                 # NOUVEAU : On baisse le stock de 1
@@ -218,6 +238,7 @@ def rendre():
     message = None
     erreur = None
     utilisateur_id = session["utilisateur"]["id"]
+    nom_table_ligne = table_ligne_livre(base)
     if request.method == "POST":
         isbn = request.form.get("isbn", "").strip()
         numero = request.form.get("numero_cd_dvd", "").strip()
@@ -227,7 +248,7 @@ def rendre():
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
             resa = base.execute(
-                'SELECT r.id_reservation, l.id_livre, l.nom_livre FROM RESERVATION r JOIN "LIGNE LIVRE" ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1',
+                f"SELECT r.id_reservation, l.id_livre, l.nom_livre FROM RESERVATION r JOIN {nom_table_ligne} ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
                 (utilisateur_id, isbn),
             ).fetchone()
             
@@ -357,6 +378,7 @@ def creer_compte():
 @application.route("/statistiques")
 def autres():
     base = bdd()
+    nom_table_ligne = table_ligne_livre(base)
     nb_clients = int(base.execute("SELECT COUNT(*) FROM CLIENT").fetchone()[0])
     nb_reservations_actives = int(
         base.execute("SELECT COUNT(*) FROM RESERVATION WHERE date_retour_effective IS NULL").fetchone()[0]
@@ -364,13 +386,13 @@ def autres():
     top_livres_demandes = [
         dict(x)
         for x in base.execute(
-            """
+            f"""
             SELECT
                 l.id_livre,
                 l.nom_livre,
                 c.nom_categorie,
                 COUNT(*) AS nb_demandes
-            FROM "LIGNE LIVRE" ll
+            FROM {nom_table_ligne} ll
             JOIN LIVRE l ON l.id_livre = ll.id_livre
             LEFT JOIN CATEGORIE c ON c.id_categorie = l.id_categorie
             GROUP BY l.id_livre, l.nom_livre, c.nom_categorie
@@ -410,23 +432,26 @@ def autres():
 
     stats_chart_image = ""
     stats_chart_error = ""
-    try:
-        figure = Figure(figsize=(8.2, 3.1))
-        axe = figure.add_subplot(111)
-        labels = [x["date"] for x in stats_30j]
-        valeurs = [x["nb_reservations"] for x in stats_30j]
-        x = list(range(len(labels)))
-        axe.plot(x, valeurs, marker="o", linewidth=2, markersize=4, color="#1f77b4")
-        axe.set_title("Nombre total de réservations par jour (30 derniers jours)")
-        axe.set_ylabel("Nombre de réservations")
-        axe.set_xticks(x[::5], [labels[i] for i in x[::5]])
-        axe.grid(axis="y", alpha=0.3)
-        tampon = BytesIO()
-        figure.tight_layout()
-        figure.savefig(tampon, format="png")
-        stats_chart_image = base64.b64encode(tampon.getvalue()).decode("utf-8")
-    except Exception:
-        stats_chart_error = "Graphique indisponible sur cet environnement."
+    if Figure is None:
+        stats_chart_error = "Graphique indisponible sur cet environnement (matplotlib absent)."
+    else:
+        try:
+            figure = Figure(figsize=(8.2, 3.1))
+            axe = figure.add_subplot(111)
+            labels = [x["date"] for x in stats_30j]
+            valeurs = [x["nb_reservations"] for x in stats_30j]
+            x = list(range(len(labels)))
+            axe.plot(x, valeurs, marker="o", linewidth=2, markersize=4, color="#1f77b4")
+            axe.set_title("Nombre total de réservations par jour (30 derniers jours)")
+            axe.set_ylabel("Nombre de réservations")
+            axe.set_xticks(x[::5], [labels[i] for i in x[::5]])
+            axe.grid(axis="y", alpha=0.3)
+            tampon = BytesIO()
+            figure.tight_layout()
+            figure.savefig(tampon, format="png")
+            stats_chart_image = base64.b64encode(tampon.getvalue()).decode("utf-8")
+        except Exception:
+            stats_chart_error = "Graphique indisponible sur cet environnement."
     return render_template(
         "autres.html",
         nb_clients=nb_clients,
@@ -458,23 +483,31 @@ def admin():
             erreur = "L'ISBN est obligatoire."
         elif action == "ajouter":
             nom = request.form.get("nom_livre", "").strip()
+            auteur = request.form.get("auteur_livre", "").strip()
+            resume = request.form.get("resume_livre", "").strip()
             categorie_choisie = request.form.get("id_categorie", "").strip()
-            
-            if not nom:
-                erreur = "Le nom du livre est obligatoire."
+            existe = base.execute(
+                "SELECT nom_livre FROM LIVRE WHERE ISBN_livre=? LIMIT 1",
+                (isbn,),
+            ).fetchone()
+            if existe:
+                base.execute(
+                    "UPDATE LIVRE SET total_exemplaires = COALESCE(total_exemplaires, 0) + 1, disponibilité = COALESCE(disponibilité, 0) + 1 WHERE ISBN_livre=?",
+                    (isbn,),
+                )
+                base.commit()
+                message = f"Exemplaire ajouté pour '{existe['nom_livre']}' (ISBN {isbn})."
+            elif not nom:
+                erreur = "Le nom du livre est obligatoire pour un nouveau livre."
             elif not categorie_choisie:
-                erreur = "Veuillez choisir une catégorie."
+                erreur = "Veuillez choisir une catégorie pour un nouveau livre."
             else:
-                existe = base.execute("SELECT 1 FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()
-                if existe:
-                    erreur = "Un livre avec cet ISBN existe déjà dans la base."
-                else:
-                    base.execute(
-                        'INSERT INTO LIVRE (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires, disponibilité) VALUES (?, ?, NULL, NULL, ?, ?, NULL, NULL, 1, 1)',
-                        (nom, "Inconnu", int(categorie_choisie), isbn),
-                    )
-                    base.commit()
-                    message = f"Le livre '{nom}' a été ajouté avec succès."
+                base.execute(
+                    "INSERT INTO LIVRE (nom_livre, auteur_livre, maison_edition_livre, annee_livre, id_categorie, ISBN_livre, resume, image, total_exemplaires, disponibilité) VALUES (?, ?, NULL, NULL, ?, ?, ?, NULL, 1, 1)",
+                    (nom, auteur or "Inconnu", int(categorie_choisie), isbn, resume or None),
+                )
+                base.commit()
+                message = f"Le livre '{nom}' a été ajouté avec succès."
                     
         elif action == "supprimer":
             livre = base.execute("SELECT nom_livre FROM LIVRE WHERE ISBN_livre=? LIMIT 1", (isbn,)).fetchone()

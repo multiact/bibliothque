@@ -55,7 +55,7 @@
     <img src="data:image/png;base64,{{ stats_chart_image }}" alt="Graphique du nombre total de réservations par jour" class="image-graphe">
 </div>
 {% else %}
-<div class="message-erreur">{{ stats_chart_error }}</div>
+<div class="message-erreur">{{ stats_chart_error or "Graphique indisponible sur cet environnement." }}</div>
 {% endif %}
 
 <h2>Top 10 livres les plus demandés</h2>
