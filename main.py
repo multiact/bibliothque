@@ -2,46 +2,27 @@
 from collections import Counter
 from io import BytesIO
 import base64
-import importlib
 import sqlite3
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+from fonctions import bdd, fermer_bdd, contexte_global, faire_slug, date_francaise, verifier_connexion
 try:
     from matplotlib.figure import Figure
 except ImportError:
     Figure = None
-import database
+
 application = Flask(__name__)
 application.secret_key = "cle_secrete_bibliotheque"
-BASE_DONNEES = database.BASE_DONNEES
-
-
-from fonctions import *
-
-
-def _identifiant_sql(nom):
-    return '"' + str(nom).replace('"', '""') + '"'
-
-
-def table_ligne_livre(base):
-    for candidat in ("ligne_livre", "LIGNE LIVRE"):
-        trouvee = base.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
-            (candidat,),
-        ).fetchone()
-        if trouvee:
-            return _identifiant_sql(trouvee["name"])
-    return _identifiant_sql("ligne_livre")
-
 
 @application.teardown_appcontext
 def nettoyage_bdd(_erreur):
     fermer_bdd(_erreur)
 
-
 @application.context_processor
 def injecter_contexte():
-    return contexte_global(BASE_DONNEES)
+    return contexte_global()
+
+
 @application.route("/")
 def accueil():
     nom = session.get("utilisateur", {}).get("prenom", "")
@@ -55,14 +36,12 @@ def catalogue(categorie_url):
         "SELECT id_categorie, nom_categorie FROM CATEGORIE ORDER BY id_categorie"
     ).fetchall()
 
-    # On cherche manuellement la catégorie qui correspond à l'URL.
     categorie_trouvee = None
     for c in toutes_categories:
         if faire_slug(c["nom_categorie"]) == categorie_url:
             categorie_trouvee = c
             break
 
-    # Si l'URL ne correspond à aucune catégorie, on renvoie vers l'accueil.
     if categorie_trouvee is None:
         return redirect(url_for("accueil"))
     livres = [
@@ -148,15 +127,13 @@ def reserver():
     message = None
     erreur = None
     utilisateur_id = session["utilisateur"]["id"]
-    nom_table_ligne = table_ligne_livre(base)
     def creer_resa():
-        reservation_id = prochain_identifiant(base, "RESERVATION", "id_reservation")
         auj = date.today()
-        base.execute(
-            "INSERT INTO RESERVATION (id_reservation, date_reservation, date_de_retour, id_client, date_limite_retour, date_retour_effective) VALUES (?, ?, NULL, ?, ?, NULL)",
-            (reservation_id, date_francaise(auj), utilisateur_id, date_francaise(auj + timedelta(days=21))),
+        curseur = base.execute(
+            "INSERT INTO RESERVATION (date_reservation, date_de_retour, id_client, date_limite_retour, date_retour_effective) VALUES (?, NULL, ?, ?, NULL)",
+            (date_francaise(auj), utilisateur_id, date_francaise(auj + timedelta(days=21))),
         )
-        return reservation_id
+        return curseur.lastrowid
     if request.method == "POST":
         isbn = request.form.get("isbn", "").strip()
         numero = request.form.get("numero_cd_dvd", "").strip()
@@ -165,7 +142,6 @@ def reserver():
         elif isbn and numero:
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
-            # On récupère le livre ET sa disponibilité actuelle
             livre = base.execute(
                 'SELECT id_livre, nom_livre, disponibilité FROM LIVRE WHERE ISBN_livre=? ORDER BY id_livre LIMIT 1',
                 (isbn,),
@@ -179,10 +155,9 @@ def reserver():
             else:
                 reservation_id = creer_resa()
                 base.execute(
-                    f"INSERT INTO {nom_table_ligne} (id_livre, id_reservation) VALUES (?, ?)",
+                    "INSERT INTO ligne_livre (id_livre, id_reservation) VALUES (?, ?)",                    
                     (livre["id_livre"], reservation_id),
                 )
-                # NOUVEAU : On baisse le stock de 1
                 base.execute(
                     'UPDATE LIVRE SET disponibilité = disponibilité - 1 WHERE id_livre=?',
                     (livre["id_livre"],)
@@ -194,6 +169,7 @@ def reserver():
                 "SELECT id_cd_dvd, nom_cd_dvd FROM cddvd WHERE id_cd_dvd=?",
                 (numero,),
             ).fetchone()
+            
             if not cd:
                 erreur = "CD/DVD introuvable pour ce numéro."
             else:
@@ -238,7 +214,6 @@ def rendre():
     message = None
     erreur = None
     utilisateur_id = session["utilisateur"]["id"]
-    nom_table_ligne = table_ligne_livre(base)
     if request.method == "POST":
         isbn = request.form.get("isbn", "").strip()
         numero = request.form.get("numero_cd_dvd", "").strip()
@@ -248,7 +223,7 @@ def rendre():
             erreur = "Remplis un seul champ : ISBN livre ou numéro CD/DVD."
         elif isbn:
             resa = base.execute(
-                f"SELECT r.id_reservation, l.id_livre, l.nom_livre FROM RESERVATION r JOIN {nom_table_ligne} ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
+                "SELECT r.id_reservation, l.id_livre, l.nom_livre FROM RESERVATION r JOIN ligne_livre ll ON ll.id_reservation=r.id_reservation JOIN LIVRE l ON l.id_livre=ll.id_livre WHERE r.id_client=? AND l.ISBN_livre=? AND r.date_retour_effective IS NULL ORDER BY r.id_reservation DESC LIMIT 1",
                 (utilisateur_id, isbn),
             ).fetchone()
             
@@ -259,7 +234,6 @@ def rendre():
                     "UPDATE RESERVATION SET date_retour_effective=?, date_de_retour=? WHERE id_reservation=?",
                     (date_francaise(date.today()), date_francaise(date.today()), resa["id_reservation"]),
                 )
-                # NOUVEAU : On remonte le stock de 1
                 base.execute(
                     'UPDATE LIVRE SET disponibilité = disponibilité + 1 WHERE id_livre=?',
                     (resa["id_livre"],)
@@ -292,11 +266,9 @@ def connexion():
     prochain = request.values.get("next") or url_for("accueil")
     
     if request.method == "POST":
-        # On récupère ce que l'utilisateur a tapé
         identifiant = request.form.get("email", "").strip().lower()
         mot_de_passe = request.form.get("password", "")
         
-        # On cherche l'utilisateur par son e-mail OU son nom d'utilisateur
         utilisateur = base.execute(
             "SELECT * FROM CLIENT WHERE (LOWER(adressemail_client)=? OR LOWER(COALESCE(nom_utilisateur,''))=?) AND mot_de_passe IS NOT NULL LIMIT 1",
             (identifiant, identifiant),
@@ -307,7 +279,6 @@ def connexion():
         elif not check_password_hash(utilisateur["mot_de_passe"], mot_de_passe):
             erreur = "Mot de passe incorrect."
         else:
-            # L'utilisateur a donné les bons identifiants, on lui crée son "badge" de base (la session)
             session["utilisateur"] = {
                 "id": utilisateur["id_client"],
                 "prenom": utilisateur["prenom_client"],
@@ -315,13 +286,10 @@ def connexion():
                 "email": utilisateur["adressemail_client"],
             }
             
-            # On vérifie son rôle (si c'est NULL, ce ne sera pas égal à 1)
-            # IMPORTANT : Il faut que la colonne 'est_admin' existe bien dans la table CLIENT
             if utilisateur["est_admin"] == 1:
                 session["admin"] = True  # On ajoute le macaron Admin sur son badge
                 return redirect(url_for("admin"))
             else:
-                # Si ce n'est pas un admin, on s'assure d'enlever tout macaron Admin résiduel
                 session.pop("admin", None)
                 return redirect(prochain)
                 
@@ -337,11 +305,9 @@ def creer_compte():
     email = request.form.get("email", "").strip().lower()
     mot_de_passe = request.form.get("password", "")
 
-    # Vérification que tous les champs sont remplis
     if not all([prenom, nom_utilisateur, date_naissance, code_postal, email, mot_de_passe]):
         return render_template("connexion.html", erreur="Tous les champs sont obligatoires.", prochain=prochain)
 
-    # Vérification si l'utilisateur existe déjà
     deja = base.execute(
         "SELECT 1 FROM CLIENT WHERE LOWER(adressemail_client)=? OR LOWER(COALESCE(nom_utilisateur,''))=? LIMIT 1",
         (email, nom_utilisateur.lower()),
@@ -351,24 +317,18 @@ def creer_compte():
         return render_template("connexion.html", erreur="Cet e-mail ou ce nom d'utilisateur existe déjà.", prochain=prochain)
 
     try:
-        # NOUVEAU : On hache TOUJOURS le mot de passe tapé par l'utilisateur (plus de mot de passe forcé !)
         mdp_hash = generate_password_hash(mot_de_passe)
-        cid = prochain_identifiant(base, "CLIENT", "id_client")
         
-        # NOUVEAU : Dans l'INSERT INTO, on ajoute "est_admin" à la fin de la liste des colonnes, 
-        # et on met un "0" écrit en dur à la fin des valeurs. Tout nouveau compte est un client.
-        base.execute(
-            'INSERT INTO CLIENT (id_client, nom_client, prenom_client, adressepostale_client, adressemail_client, date_naissance_client, telephone_client, nom_utilisateur, mot_de_passe, date_creation, code_postal, est_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
-            (cid, nom_utilisateur, prenom, code_postal, email, date_naissance, None, nom_utilisateur, mdp_hash, date_francaise(date.today()), code_postal),
+        curseur = base.execute(
+            'INSERT INTO CLIENT (nom_client, prenom_client, adressepostale_client, adressemail_client, date_naissance_client, telephone_client, nom_utilisateur, mot_de_passe, date_creation, code_postal, est_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
+            (nom_utilisateur, prenom, code_postal, email, date_naissance, None, nom_utilisateur, mdp_hash, date_francaise(date.today()), code_postal),
         )
+        cid = curseur.lastrowid
         base.commit()
     except sqlite3.IntegrityError:
         return render_template("connexion.html", erreur="Cet e-mail ou ce nom d'utilisateur existe déjà.", prochain=prochain)
-
-    # On crée le badge de session classique pour cet utilisateur fraîchement inscrit
     session["utilisateur"] = {"id": cid, "prenom": prenom, "nom_utilisateur": nom_utilisateur, "email": email}
     
-    # NOUVEAU : Par sécurité, on s'assure de retirer tout macaron "admin" résiduel de la session
     session.pop("admin", None)
     
     return redirect(prochain)
@@ -378,7 +338,6 @@ def creer_compte():
 @application.route("/statistiques")
 def autres():
     base = bdd()
-    nom_table_ligne = table_ligne_livre(base)
     nb_clients = int(base.execute("SELECT COUNT(*) FROM CLIENT").fetchone()[0])
     nb_reservations_actives = int(
         base.execute("SELECT COUNT(*) FROM RESERVATION WHERE date_retour_effective IS NULL").fetchone()[0]
@@ -392,7 +351,7 @@ def autres():
                 l.nom_livre,
                 c.nom_categorie,
                 COUNT(*) AS nb_demandes
-            FROM {nom_table_ligne} ll
+            FROM ligne_livre ll
             JOIN LIVRE l ON l.id_livre = ll.id_livre
             LEFT JOIN CATEGORIE c ON c.id_categorie = l.id_categorie
             GROUP BY l.id_livre, l.nom_livre, c.nom_categorie
@@ -461,7 +420,6 @@ def autres():
         stats_chart_error=stats_chart_error,
         top_livres_demandes=top_livres_demandes,
     )
-@application.route("/admin", methods=["GET", "POST"])
 @application.route("/admin", methods=["GET", "POST"])
 def admin():
     if not session.get("admin"):
