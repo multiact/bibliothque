@@ -351,7 +351,7 @@ def autres():
                 l.nom_livre,
                 c.nom_categorie,
                 COUNT(*) AS nb_demandes
-            FROM ligne_livre ll
+            FROM LIGNE_LIVRE ll
             JOIN LIVRE l ON l.id_livre = ll.id_livre
             LEFT JOIN CATEGORIE c ON c.id_categorie = l.id_categorie
             GROUP BY l.id_livre, l.nom_livre, c.nom_categorie
