@@ -1,11 +1,9 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Administration{% endblock %}
-
 {% block content %}
-<div class="bloc-principal">
-    <h1>Panneau d'administration</h1>
-    <p>Gere le catalogue de la bibliotheque (ajout et retrait de livres).</p>
+<h1>Panneau d'administration</h1>
+<p>GÃ¨re le catalogue de la bibliothÃ¨que (ajout et retrait de livres).</p>
 
     {% if erreur %}
     <div class="message-erreur">{{ erreur }}</div>
@@ -31,9 +29,9 @@
                 </div>
 
                 <div class="champ-formulaire">
-                    <label>Categorie</label>
+                    <label>CatÃ©gorie</label>
                     <select name="id_categorie" required>
-                        <option value="">Choisir une categorie...</option>
+                        <option value="">Choisir une catÃ©gorie...</option>
                         {% for categorie in categories %}
                         <option value="{{ categorie['id_categorie'] }}">{{ categorie['nom_categorie'] }}</option>
                         {% endfor %}
@@ -41,7 +39,7 @@
                 </div>
 
                 <div class="champ-formulaire">
-                    <label>Numero ISBN</label>
+                    <label>NumÃ©ro ISBN</label>
                     <input type="text" name="isbn_livre" required>
                 </div>
 
@@ -60,7 +58,7 @@
                 <input type="hidden" name="action" value="supprimer">
 
                 <div class="champ-formulaire">
-                    <label>ISBN du livre a supprimer</label>
+                    <label>ISBN du livre Ã  supprimer</label>
                     <input type="text" name="isbn_livre" required>
                 </div>
 
@@ -70,7 +68,7 @@
     </div>
 
     <div class="zone-historique">
-        <h2>Derniers livres ajoutes</h2>
+        <h2>Derniers livres ajoutÃ©s</h2>
         <div class="liste-admin">
             {% for livre in livres %}
             <div class="ligne-historique">
@@ -82,5 +80,6 @@
             {% endfor %}
         </div>
     </div>
-</div>
 {% endblock %}
+
+

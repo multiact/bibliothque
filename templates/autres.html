@@ -1,7 +1,6 @@
 ﻿{% extends "base.html" %}
 
 {% block title %}Autres{% endblock %}
-
 {% block content %}
 <h1>Autres</h1>
 <h2>Statistiques</h2>
@@ -17,8 +16,8 @@
     </div>
 </div>
 
-<h2>équipe</h2>
-<h2>La grande gérante de la bibliothèque est <strong>Lisette Baccega</strong>.</h2>
+<h2>Notre équipe</h2>
+
 <div class="table-conteneur">
     <table class="tableau-horaires">
         <thead>
@@ -28,6 +27,10 @@
             </tr>
         </thead>
         <tbody>
+            <tr>
+                <td>Lisette Baccega</td>
+                <td>La grande gérante de la bibliothèque</td>
+            </tr>
             <tr>
                 <td>Yael Lunven</td>
                 <td>Responsable des réservations</td>
@@ -49,7 +52,6 @@
 </div>
 
 <h3>Nombre total de réservations par jour (30 jours)</h3>
-<p><strong>Total des réservations (30 jours) :</strong> {{ total_reservations_30j }}</p>
 {% if stats_chart_image %}
 <div class="zone-graphe">
     <img src="data:image/png;base64,{{ stats_chart_image }}" alt="Graphique du nombre total de réservations par jour" class="image-graphe">
@@ -100,7 +102,7 @@
         </thead>
         <tbody>
             <tr>
-                <td>Accueil bibliothéque</td>
+                <td>Accueil bibliothèque</td>
                 <td>06 07 03 67 42 - bibliothequedevalence@gmail.com</td>
                 <td>Mardi à dimanche</td>
             </tr>
@@ -123,5 +125,6 @@
     </table>
 </div>
 {% endblock %}
+
 
 

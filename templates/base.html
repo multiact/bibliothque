@@ -2,9 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Bibliothèque de Valence{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='icone.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='4') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico', v='4') }}">
+    {% block head_extra %}{% endblock %}
 </head>
 <body>
 <header class="entete">

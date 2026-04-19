@@ -1,11 +1,11 @@
 ﻿{% extends "base.html" %}
 
 {% block title %}Réserver{% endblock %}
-
 {% block content %}
 <h1>Réserver</h1>
 <p>Livre : entre l'ISBN. CD/DVD : entre le numéro.</p>
 <p>Règles : réservation possible jusqu'à un mois maximum, durée de prêt limitée à 3 semaines.</p>
+<p>La date de réservation est enregistrée automatiquement au moment du clic sur le bouton.</p>
 
 {% if erreur %}
 <div class="message-erreur">{{ erreur }}</div>
@@ -24,10 +24,6 @@
             <div class="champ-formulaire grand">
                 <label for="numero_cd_dvd">Numéro du CD/DVD</label>
                 <input type="number" id="numero_cd_dvd" name="numero_cd_dvd" min="1">
-            </div>
-            <div class="champ-formulaire">
-                <label for="date_reservation">Date de réservation</label>
-                <input type="date" id="date_reservation" name="date_reservation">
             </div>
             <div class="champ-formulaire grand">
                 <button type="submit">Valider la réservation</button>
@@ -76,5 +72,6 @@
     </table>
 </div>
 {% endblock %}
+
 
 

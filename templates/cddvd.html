@@ -1,7 +1,6 @@
 ﻿{% extends "base.html" %}
 
 {% block title %}CD/DVD - Bibliothèque{% endblock %}
-
 {% block content %}
 <h1>Catalogue CD / DVD</h1>
 <p>Recherche par titre ou artiste.</p>
@@ -26,6 +25,10 @@
         <p><strong>Exemplaires restants :</strong> {{ item["exemplaires_restants"] }} / {{ item["total_exemplaires"] }}</p>
         {% if item["exemplaires_restants"] > 0 %}
             <p class="disponible">Disponible</p>
+            <form action="{{ url_for('reserver') }}" method="POST">
+                <input type="hidden" name="numero_cd_dvd" value="{{ item['id_cd_dvd'] }}">
+                <button type="submit" class="bouton-reserver">Réserver ce CD/DVD</button>
+            </form>
         {% else %}
             <p class="indisponible">Indisponible</p>
         {% endif %}
@@ -35,5 +38,6 @@
     {% endfor %}
 </div>
 {% endblock %}
+
 
 

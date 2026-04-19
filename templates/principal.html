@@ -1,9 +1,8 @@
 ﻿{% extends "base.html" %}
 
-{% block title %}Accueil - Bibliothéque{% endblock %}
-
+{% block title %}Accueil - Bibliothèque{% endblock %}
 {% block content %}
-<h1>Bienvenue {{nomutlisateur}} à la bibliothèque de Valence</h1>
+<h1>Bienvenue {{ nomutlisateur }} à la bibliothèque de Valence</h1>
 <p>Bibliothèque municipale du centre-ville.</p>
 
 <div class="liste-blocs">
@@ -33,7 +32,7 @@
 <h2>Horaires</h2>
 <table class="tableau-horaires">
     <thead>
-        <tr><th>Jour</th><th>Matin</th><th>Aprés-midi</th></tr>
+        <tr><th>Jour</th><th>Matin</th><th>Après-midi</th></tr>
     </thead>
     <tbody>
         <tr><td>Lundi</td><td>Fermé</td><td>Fermé</td></tr>
@@ -42,9 +41,10 @@
         <tr><td>Jeudi</td><td>8h30 - 12h</td><td>14h - 18h</td></tr>
         <tr><td>Vendredi</td><td>8h30 - 12h</td><td>14h - 20h</td></tr>
         <tr><td>Samedi</td><td>10h - 13h</td><td>14h - 17h</td></tr>
-        <tr><td>Dimanche</td><td>10h - 12h</td><td>Fermï¿½</td></tr>
+        <tr><td>Dimanche</td><td>10h - 12h</td><td>Fermé</td></tr>
     </tbody>
 </table>
 {% endblock %}
+
 
 
